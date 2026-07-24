@@ -268,8 +268,29 @@ async function main(): Promise<void> {
   process.once("SIGINT", shutdown);
 }
 
+function startupErrorCode(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  if (message.includes("RUNTIME_BOT_CONFIG_JSON")) {
+    return "BOT_CONFIG_INVALID";
+  }
+  if (message.includes("Rasa JWT private key file")) {
+    return "RASA_KEY_INVALID";
+  }
+  if (message.includes("Required secret file")) {
+    return "SECRET_FILE_INVALID";
+  }
+  if (message.includes("RASA_BASE_URL")) {
+    return "RASA_URL_INVALID";
+  }
+  if (message.includes("STOREFRONT_CAPABILITIES_BASE_URL")) {
+    return "CAPABILITY_URL_INVALID";
+  }
+  return "CONFIG_INVALID";
+}
+
 void main().catch((error: unknown) => {
   console.error("[rasa-flow-proxy] Startup failed", {
+    code: startupErrorCode(error),
     errorType: error instanceof Error ? error.name : "unknown",
   });
   process.exit(1);
