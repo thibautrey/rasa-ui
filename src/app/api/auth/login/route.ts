@@ -6,6 +6,9 @@ import { db } from "@/lib/db";
 import {
   assertSameOrigin,
   clientIp,
+  RateLimitUnavailableError,
+  readBoundedJson,
+  RequestBodyTooLargeError,
   takeRateLimit
 } from "@/lib/security";
 
@@ -17,7 +20,7 @@ const credentialsSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     assertSameOrigin(request);
-    const rateLimit = takeRateLimit(
+    const rateLimit = await takeRateLimit(
       `login:${clientIp(request)}`,
       10,
       15 * 60 * 1000
@@ -32,7 +35,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const credentials = credentialsSchema.parse(await request.json());
+    const credentials = credentialsSchema.parse(
+      await readBoundedJson(request, 2_048)
+    );
     const user = await db.user.findUnique({
       where: { email: credentials.email }
     });
@@ -63,7 +68,19 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (error) {
+    if (error instanceof RateLimitUnavailableError) {
+      return NextResponse.json(
+        { error: "Service temporairement indisponible." },
+        { status: 503, headers: { "Retry-After": "5" } }
+      );
+    }
+    if (error instanceof RequestBodyTooLargeError) {
+      return NextResponse.json(
+        { error: "Requête trop volumineuse." },
+        { status: 413 }
+      );
+    }
     return NextResponse.json(
       { error: "La connexion a échoué." },
       { status: 400 }

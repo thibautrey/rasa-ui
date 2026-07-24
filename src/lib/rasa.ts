@@ -27,7 +27,11 @@ export type RasaReply = {
 
 type RasaRequestOptions = {
   timeoutMs?: number;
+  maxResponseBytes?: number;
 };
+
+const DEFAULT_JSON_RESPONSE_BYTES = 512 * 1024;
+const MAX_ERROR_RESPONSE_BYTES = 16 * 1024;
 
 export class RasaApiError extends Error {
   constructor(
@@ -50,6 +54,70 @@ function rasaUrl(path: string) {
   return url;
 }
 
+async function readBoundedText(response: Response, maxBytes: number) {
+  const contentLength = response.headers.get("content-length");
+  if (
+    contentLength &&
+    /^\d+$/.test(contentLength) &&
+    Number(contentLength) > maxBytes
+  ) {
+    await response.body?.cancel();
+    throw new RasaApiError(
+      "Rasa returned an oversized response.",
+      502,
+      undefined,
+      "RASA_RESPONSE_TOO_LARGE"
+    );
+  }
+  if (!response.body) return "";
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  while (true) {
+    const chunk = await reader.read();
+    if (chunk.done) break;
+    totalBytes += chunk.value.byteLength;
+    if (totalBytes > maxBytes) {
+      await reader.cancel();
+      throw new RasaApiError(
+        "Rasa returned an oversized response.",
+        502,
+        undefined,
+        "RASA_RESPONSE_TOO_LARGE"
+      );
+    }
+    chunks.push(chunk.value);
+  }
+
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(
+      Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)))
+    );
+  } catch {
+    throw new RasaApiError(
+      "Rasa returned invalid UTF-8.",
+      502,
+      undefined,
+      "RASA_INVALID_RESPONSE"
+    );
+  }
+}
+
+async function readBoundedJson<T>(response: Response, maxBytes: number) {
+  const text = await readBoundedText(response, maxBytes);
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new RasaApiError(
+      "Rasa returned invalid JSON.",
+      502,
+      undefined,
+      "RASA_INVALID_RESPONSE"
+    );
+  }
+}
+
 async function rasaFetch(
   path: string,
   init?: RequestInit,
@@ -61,6 +129,7 @@ async function rasaFetch(
     response = await fetch(rasaUrl(path), {
       ...init,
       cache: "no-store",
+      redirect: "error",
       signal: AbortSignal.timeout(timeoutMs)
     });
   } catch (error) {
@@ -81,12 +150,20 @@ async function rasaFetch(
   }
 
   if (!response.ok) {
-    const body = await response.text();
-    let details: unknown = body;
+    let details: unknown;
     try {
-      details = JSON.parse(body);
+      const body = await readBoundedText(
+        response,
+        MAX_ERROR_RESPONSE_BYTES
+      );
+      details = body;
+      try {
+        details = JSON.parse(body);
+      } catch {
+        // Keep the bounded plain-text response.
+      }
     } catch {
-      // Keep the plain-text response.
+      details = undefined;
     }
     throw new RasaApiError(
       `Rasa returned HTTP ${response.status}.`,
@@ -127,15 +204,20 @@ export function publicRasaHttpStatus(error: unknown) {
 
 export async function getRasaStatus(timeoutMs?: number) {
   const response = await rasaFetch("/status", undefined, { timeoutMs });
-  return response.json() as Promise<RasaStatus>;
+  return readBoundedJson<RasaStatus>(
+    response,
+    DEFAULT_JSON_RESPONSE_BYTES
+  );
 }
 
 export async function getRasaOverview() {
   const timeoutMs = 10_000;
   const [root, version, status] = await Promise.allSettled([
-    rasaFetch("/", undefined, { timeoutMs }).then((response) => response.text()),
+    rasaFetch("/", undefined, { timeoutMs }).then((response) =>
+      readBoundedText(response, 64 * 1024)
+    ),
     rasaFetch("/version", undefined, { timeoutMs }).then((response) =>
-      response.json()
+      readBoundedJson<unknown>(response, DEFAULT_JSON_RESPONSE_BYTES)
     ),
     getRasaStatus(timeoutMs)
   ]);
@@ -170,40 +252,50 @@ export async function getRasaOverview() {
   };
 }
 
-export async function parseMessage(text: string) {
+export async function parseMessage(
+  text: string,
+  options: RasaRequestOptions = {}
+) {
   const response = await rasaFetch("/model/parse", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text })
-  });
-  return response.json() as Promise<RasaParseResult>;
+  }, options);
+  return readBoundedJson<RasaParseResult>(
+    response,
+    options.maxResponseBytes ?? DEFAULT_JSON_RESPONSE_BYTES
+  );
 }
 
 export async function sendRestMessage(
   sender: string,
   message: string,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
+  options: RasaRequestOptions = {}
 ) {
   const response = await rasaFetch("/webhooks/rest/webhook", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sender, message, metadata })
-  });
-  return response.json() as Promise<RasaReply[]>;
+  }, options);
+  return readBoundedJson<RasaReply[]>(
+    response,
+    options.maxResponseBytes ?? DEFAULT_JSON_RESPONSE_BYTES
+  );
 }
 
 export async function getTracker(sender: string) {
   const response = await rasaFetch(
     `/conversations/${encodeURIComponent(sender)}/tracker?include_events=APPLIED`
   );
-  return response.json();
+  return readBoundedJson<unknown>(response, 16 * 1024 * 1024);
 }
 
 export async function getLoadedDomain() {
   const response = await rasaFetch("/domain", {
     headers: { Accept: "application/json" }
   });
-  return response.json();
+  return readBoundedJson<unknown>(response, 16 * 1024 * 1024);
 }
 
 function modelFilename(response: Response) {

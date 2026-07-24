@@ -6,9 +6,15 @@ services:
     depends_on:
       database:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgresql://rasa_ui:${SERVICE_PASSWORD_POSTGRES:?SERVICE_PASSWORD_POSTGRES is required}@database:5432/rasa_ui?schema=public
+      REDIS_URL: redis://redis:6379
+      REDIS_PASSWORD: ${SERVICE_PASSWORD_REDIS:?SERVICE_PASSWORD_REDIS is required}
       AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required}
+      WIDGET_SESSION_SECRET: ${WIDGET_SESSION_SECRET:?WIDGET_SESSION_SECRET is required}
+      STOREFRONT_WIDGET_ENABLED: ${STOREFRONT_WIDGET_ENABLED:-false}
       ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL is required}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
       RASA_BASE_URL: ${RASA_BASE_URL:?RASA_BASE_URL is required}
@@ -21,6 +27,11 @@ services:
       MODEL_DOWNLOAD_TOKEN: ${MODEL_DOWNLOAD_TOKEN:?MODEL_DOWNLOAD_TOKEN is required}
       RASA_TRAINING_TIMEOUT_MS: ${RASA_TRAINING_TIMEOUT_MS:-1800000}
       TRAINING_WORKER_ENABLED: ${TRAINING_WORKER_ENABLED:-true}
+      STOREFRONT_CAPABILITIES_ENABLED: ${STOREFRONT_CAPABILITIES_ENABLED:-false}
+      STOREFRONT_CAPABILITIES_BASE_URL: ${STOREFRONT_CAPABILITIES_BASE_URL:-}
+      STOREFRONT_CAPABILITIES_KEY_ID: ${STOREFRONT_CAPABILITIES_KEY_ID:-}
+      STOREFRONT_CAPABILITIES_SECRET: ${STOREFRONT_CAPABILITIES_SECRET:-}
+      STOREFRONT_CAPABILITIES_BOT_ID: ${STOREFRONT_CAPABILITIES_BOT_ID:-}
     extra_hosts:
       - "${RASA_ORIGIN_HOST:-rasa.pleiades.solutions}:${RASA_ORIGIN_IP:-host-gateway}"
     ports:
@@ -65,5 +76,30 @@ services:
       retries: 20
       start_period: 5s
 
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${SERVICE_PASSWORD_REDIS:?SERVICE_PASSWORD_REDIS is required}
+    command:
+      [
+        "/bin/sh",
+        "-c",
+        'exec redis-server --requirepass "$$REDIS_PASSWORD" --appendonly yes'
+      ]
+    volumes:
+      - rasa-ui-redis:/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'redis-cli --no-auth-warning -a "$$REDIS_PASSWORD" ping | grep -q PONG'
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
 volumes:
   rasa-ui-postgres:
+  rasa-ui-redis:

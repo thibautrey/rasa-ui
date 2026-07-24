@@ -484,8 +484,8 @@ export function BotWizard({
                 <div>
                   <strong>Passerelle sécurisée</strong>
                   <span>
-                    Origin allowlist, limite de débit et identifiant visiteur
-                    isolé par widget.
+                    Origin allowlist, quotas Redis et session serveur signée,
+                    isolée dans une iframe.
                   </span>
                 </div>
               </div>
@@ -525,8 +525,8 @@ export function BotWizard({
                 <p className="eyebrow">Prêt à installer</p>
                 <h2>Ajouter le widget à la boutique</h2>
                 <p>
-                  Le script charge uniquement la configuration publique. Les
-                  messages transitent par notre backend authentifié.
+                  Le script charge une iframe sandboxée. Les messages utilisent
+                  une session serveur signée et expirante.
                 </p>
               </div>
               <div className="success-banner install-success">
@@ -714,5 +714,5 @@ export function BotWizard({
 
 function installSnippet(appUrl: string, publicKey: string) {
   const baseUrl = appUrl.replace(/\/+$/, "");
-  return `<script\n  src="${baseUrl}/widget.js"\n  data-bot-key="${publicKey}"\n  async\n></script>`;
+  return `<script\n  src="${baseUrl}/widget-loader-v1.js"\n  data-bot-key="${publicKey}"\n  integrity="sha384-qgpggMbGTbw3QV/jjircJdGptUt/NjBRiicREJN5ncFyBjHk8H0XGjun+kLE7HFf"\n  crossorigin="anonymous"\n  referrerpolicy="no-referrer"\n  async\n></script>`;
 }

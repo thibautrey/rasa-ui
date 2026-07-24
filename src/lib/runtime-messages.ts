@@ -9,20 +9,46 @@ import {
 } from "@/lib/litellm";
 import {
   parseMessage,
-  publicRasaError,
+  RasaApiError,
   sendRestMessage,
   type RasaParseResult,
   type RasaReply
 } from "@/lib/rasa";
+import {
+  coarsenRuntimeCoordinates,
+  containsSensitiveRuntimeText,
+  runtimePseudonym,
+  safeRuntimeText
+} from "@/lib/runtime-privacy";
+import {
+  executeStorefrontCapability,
+  resolveStorefrontCapabilityRequest,
+  storefrontCapabilitiesEnabled,
+  storefrontCapabilityReply,
+  StorefrontCapabilityError
+} from "@/lib/storefront-capabilities";
+import {
+  acquireRuntimeExternalLease,
+  RuntimeExternalLimitError,
+  type RuntimeExternalLease
+} from "@/lib/runtime-external-limit";
 
 type RuntimeMessageInput = {
   assistantId: string;
   senderId: string;
-  channel: string;
+  channel: "storefront" | "studio";
   storeBotId?: string;
   requestId: string;
   text: string;
   metadata: Record<string, unknown>;
+};
+
+type PreparedRuntimeMessageInput = Omit<
+  RuntimeMessageInput,
+  "metadata"
+> & {
+  privacyBlocked: boolean;
+  publicRequestId: string;
 };
 
 type RuntimeEnvelope = {
@@ -35,7 +61,6 @@ type RuntimeEnvelope = {
     error: string;
     code: string;
     rasaStatus?: number;
-    details?: unknown;
   };
 };
 
@@ -58,6 +83,45 @@ export class RuntimeMessageError extends Error {
     super(message);
     this.name = "RuntimeMessageError";
   }
+}
+
+const PRIVACY_BLOCKED_REPLY =
+  "Pour protéger vos données, ce message n’a été transmis ni à Rasa ni à un modèle d’IA. Utilisez l’espace client sécurisé pour toute demande contenant des coordonnées personnelles ou une référence de commande.";
+const UNSAFE_RESPONSE_REPLACEMENT =
+  "Je ne peux pas afficher cette réponse ici car elle pourrait contenir une donnée sensible.";
+const STOREFRONT_RASA_TIMEOUT_MS = 8_000;
+const STOREFRONT_RASA_MAX_RESPONSE_BYTES = 64 * 1024;
+const STOREFRONT_LITELLM_TIMEOUT_MS = 8_000;
+const STOREFRONT_LITELLM_MAX_RESPONSE_BYTES = 64 * 1024;
+
+function prepareRuntimeInput(
+  input: RuntimeMessageInput
+): PreparedRuntimeMessageInput {
+  const publicText = coarsenRuntimeCoordinates(input.text);
+  const privacyBlocked = containsSensitiveRuntimeText(publicText);
+  const messageFingerprint = runtimePseudonym(
+    "message",
+    `${input.assistantId}\0${input.text}`
+  ).slice(-16);
+
+  return {
+    assistantId: input.assistantId,
+    senderId: runtimePseudonym(
+      "sender",
+      `${input.assistantId}\0${input.senderId}`
+    ),
+    channel: input.channel,
+    storeBotId: input.storeBotId,
+    requestId: runtimePseudonym(
+      "request",
+      `${input.assistantId}\0${input.requestId}`
+    ),
+    text: privacyBlocked
+      ? `[MESSAGE_SENSIBLE_MASQUE:${messageFingerprint}]`
+      : publicText,
+    privacyBlocked,
+    publicRequestId: input.requestId
+  };
 }
 
 function json(value: unknown) {
@@ -87,8 +151,11 @@ function payload(runtime: RuntimeEnvelope) {
 }
 
 function nluSummary(nlu: RasaParseResult) {
-  const intent =
-    typeof nlu.intent?.name === "string" ? nlu.intent.name : undefined;
+  const candidateIntent =
+    typeof nlu.intent?.name === "string" ? nlu.intent.name : "";
+  const intent = /^[A-Za-z0-9_.:-]{1,120}$/.test(candidateIntent)
+    ? candidateIntent
+    : undefined;
   const rawConfidence = nlu.intent?.confidence;
   const confidence =
     typeof rawConfidence === "number" && Number.isFinite(rawConfidence)
@@ -99,6 +166,104 @@ function nluSummary(nlu: RasaParseResult) {
     confidence,
     isFallback: intent === "nlu_fallback"
   };
+}
+
+function publicNlu(nlu: RasaParseResult): RasaParseResult {
+  const summary = nluSummary(nlu);
+  return {
+    ...(summary.intent
+      ? {
+          intent: {
+            name: summary.intent,
+            ...(summary.confidence !== undefined
+              ? { confidence: summary.confidence }
+              : {})
+          }
+        }
+      : {}),
+    entities: []
+  };
+}
+
+function safeReplyText(value: unknown) {
+  if (typeof value !== "string") return "";
+  const text = value.trim().slice(0, 8_000);
+  return text
+    ? safeRuntimeText(text, UNSAFE_RESPONSE_REPLACEMENT)
+    : "";
+}
+
+function safeRasaReplies(replies: RasaReply[]): RasaReply[] {
+  const safeReplies = replies.slice(0, 12).flatMap((reply) => {
+    const text = safeReplyText(reply.text);
+    const buttons = Array.isArray(reply.buttons)
+      ? reply.buttons.slice(0, 8).flatMap((button) => {
+          const title = safeReplyText(button?.title).slice(0, 120);
+          const buttonPayload =
+            typeof button?.payload === "string"
+              ? button.payload.trim()
+              : "";
+          const payload = /^\/[A-Za-z][A-Za-z0-9_]{0,119}$/.test(
+            buttonPayload
+          )
+            ? buttonPayload
+            : "";
+          return title && payload ? [{ title, payload }] : [];
+        })
+      : [];
+    return text || buttons.length ? [{ text, buttons }] : [];
+  });
+
+  return safeReplies.length
+    ? safeReplies
+    : [{ text: "Je n’ai pas de réponse sûre à afficher pour cette demande." }];
+}
+
+function safeRuntimeFailure(error: unknown) {
+  if (error instanceof RuntimeMessageError) return error;
+  if (error instanceof RuntimeExternalLimitError) {
+    const rateLimited =
+      error.code === "RUNTIME_EXTERNAL_RATE_LIMIT" ||
+      error.code === "RUNTIME_EXTERNAL_CONCURRENCY_LIMIT";
+    return new RuntimeMessageError(
+      rateLimited
+        ? "Le service reçoit trop de demandes. Réessayez dans un instant."
+        : "Le service est temporairement indisponible.",
+      rateLimited ? 429 : 503,
+      error.code
+    );
+  }
+  if (error instanceof StorefrontCapabilityError) {
+    const status =
+      error.status === 400 || error.status === 403
+        ? error.status
+        : error.status === 504
+          ? 504
+          : 503;
+    return new RuntimeMessageError(
+      "Le service d’information public est temporairement indisponible.",
+      status,
+      error.code
+    );
+  }
+  if (error instanceof RasaApiError) {
+    const status =
+      error.code === "RASA_TIMEOUT"
+        ? 504
+        : error.code === "RASA_UNREACHABLE"
+          ? 503
+          : 502;
+    return new RuntimeMessageError(
+      "Le moteur conversationnel est temporairement indisponible.",
+      status,
+      error.code
+    );
+  }
+  return new RuntimeMessageError(
+    "Le message n’a pas pu être traité.",
+    500,
+    "RUNTIME_MESSAGE_FAILED"
+  );
 }
 
 async function findRequest(requestId: string) {
@@ -123,7 +288,7 @@ async function findRequest(requestId: string) {
 
 function assertMatchingRequest(
   existing: NonNullable<Awaited<ReturnType<typeof findRequest>>>,
-  input: RuntimeMessageInput
+  input: PreparedRuntimeMessageInput
 ) {
   if (
     existing.direction !== "INBOUND" ||
@@ -141,7 +306,7 @@ function assertMatchingRequest(
 
 function cachedResult(
   existing: NonNullable<Awaited<ReturnType<typeof findRequest>>>,
-  input: RuntimeMessageInput
+  input: PreparedRuntimeMessageInput
 ): RuntimeMessageResult {
   assertMatchingRequest(existing, input);
   const runtime = readEnvelope(existing.payload);
@@ -153,10 +318,21 @@ function cachedResult(
     );
   }
   if (runtime?.state === "FAILED") {
+    const code = runtime.error?.code ?? "REQUEST_FAILED";
+    const status =
+      code === "RUNTIME_EXTERNAL_RATE_LIMIT" ||
+      code === "RUNTIME_EXTERNAL_CONCURRENCY_LIMIT"
+        ? 429
+        : code.includes("TIMEOUT")
+          ? 504
+          : code.includes("UNAVAILABLE") ||
+              code.includes("NOT_CONFIGURED")
+            ? 503
+            : 502;
     throw new RuntimeMessageError(
       runtime.error?.error ?? "Le traitement précédent de ce message a échoué.",
-      502,
-      runtime.error?.code ?? "REQUEST_FAILED"
+      status,
+      code
     );
   }
   const cachedNlu = runtime?.nlu;
@@ -173,7 +349,7 @@ function cachedResult(
     );
   }
   return {
-    requestId: input.requestId,
+    requestId: input.publicRequestId,
     conversationId: existing.conversationId,
     replies: runtime.replies,
     nlu: cachedNlu,
@@ -183,7 +359,7 @@ function cachedResult(
   };
 }
 
-async function createInbound(input: RuntimeMessageInput) {
+async function createInbound(input: PreparedRuntimeMessageInput) {
   const existing = await findRequest(input.requestId);
   if (existing) return { existing, message: null };
 
@@ -278,11 +454,66 @@ function withGeneratedText(replies: RasaReply[], text: string): RasaReply[] {
   );
 }
 
+async function completeMessage(input: {
+  message: { id: string; conversationId: string };
+  replies: RasaReply[];
+  nlu: RasaParseResult;
+  generation: GenerationMetadata;
+  latencyMs: number;
+}) {
+  const summary = nluSummary(input.nlu);
+  await db.$transaction([
+    db.message.update({
+      where: { id: input.message.id },
+      data: {
+        intent: summary.intent,
+        confidence: summary.confidence,
+        latencyMs: input.latencyMs,
+        isFallback: summary.isFallback,
+        payload: payload({
+          version: 1,
+          state: "COMPLETED",
+          replies: input.replies,
+          nlu: input.nlu,
+          generation: input.generation
+        })
+      }
+    }),
+    ...(input.replies.length
+      ? [
+          db.message.createMany({
+            data: input.replies.map((reply) => ({
+              conversationId: input.message.conversationId,
+              direction: "OUTBOUND" as const,
+              text: reply.text ?? "Réponse sécurisée",
+              payload: json({ ...reply, generation: input.generation })
+            }))
+          })
+        ]
+      : []),
+    db.conversation.update({
+      where: { id: input.message.conversationId },
+      data: { lastMessageAt: new Date() }
+    })
+  ]);
+}
+
 export async function executeRuntimeMessage(
-  input: RuntimeMessageInput
+  unsafeInput: RuntimeMessageInput
 ): Promise<RuntimeMessageResult> {
   const startedAt = Date.now();
-  const { existing, message } = await createInbound(input);
+  const input = prepareRuntimeInput(unsafeInput);
+  let inbound: Awaited<ReturnType<typeof createInbound>>;
+  try {
+    inbound = await createInbound(input);
+  } catch {
+    throw new RuntimeMessageError(
+      "Le message n’a pas pu être enregistré.",
+      500,
+      "RUNTIME_STORAGE_FAILED"
+    );
+  }
+  const { existing, message } = inbound;
   if (existing) return cachedResult(existing, input);
   if (!message) {
     throw new RuntimeMessageError(
@@ -292,23 +523,91 @@ export async function executeRuntimeMessage(
     );
   }
 
+  let externalLease: RuntimeExternalLease | null = null;
+  let storefrontBotId: string | null = null;
   try {
-    const [rasaReplies, nlu, context] = await Promise.all([
-      sendRestMessage(input.senderId, input.text, {
-        ...input.metadata,
-        requestId: input.requestId
-      }),
-      parseMessage(input.text),
-      generationContext(input.assistantId, message.conversationId, message.id)
-    ]);
-    let replies = rasaReplies;
-    let generation: GenerationMetadata = {
+    const disabledGeneration: GenerationMetadata = {
       provider: "litellm",
       model: liteLlmModel(),
       status: "DISABLED"
     };
 
-    if (context.assistant.llmEnabled) {
+    if (input.privacyBlocked) {
+      const replies: RasaReply[] = [{ text: PRIVACY_BLOCKED_REPLY }];
+      const nlu: RasaParseResult = {
+        intent: { name: "privacy_sensitive_input", confidence: 1 },
+        entities: []
+      };
+      const latencyMs = Date.now() - startedAt;
+      await completeMessage({
+        message,
+        replies,
+        nlu,
+        generation: disabledGeneration,
+        latencyMs
+      });
+      return {
+        requestId: input.publicRequestId,
+        conversationId: message.conversationId,
+        replies,
+        nlu,
+        latencyMs,
+        cached: false,
+        generation: disabledGeneration
+      };
+    }
+
+    if (input.channel === "storefront") {
+      if (!input.storeBotId) {
+        throw new RuntimeMessageError(
+          "Le bot storefront n’est pas configuré.",
+          503,
+          "RUNTIME_STOREFRONT_BOT_NOT_CONFIGURED"
+        );
+      }
+      storefrontBotId = input.storeBotId;
+      externalLease = await acquireRuntimeExternalLease(storefrontBotId);
+    }
+    const rasaOptions =
+      input.channel === "storefront"
+        ? {
+            timeoutMs: STOREFRONT_RASA_TIMEOUT_MS,
+            maxResponseBytes: STOREFRONT_RASA_MAX_RESPONSE_BYTES
+          }
+        : undefined;
+    const [rawRasaReplies, rawNlu, context] = await Promise.all([
+      sendRestMessage(input.senderId, input.text, {
+        source:
+          input.channel === "storefront"
+            ? "storefront-runtime"
+            : "studio-runtime",
+        requestId: input.requestId
+      }, rasaOptions),
+      parseMessage(input.text, rasaOptions),
+      generationContext(input.assistantId, message.conversationId, message.id)
+    ]);
+    const nlu = publicNlu(rawNlu);
+    let replies = safeRasaReplies(rawRasaReplies);
+    let generation = disabledGeneration;
+    const capabilityRequest =
+      input.channel === "storefront" && storefrontCapabilitiesEnabled()
+        ? resolveStorefrontCapabilityRequest(rawNlu, rawRasaReplies)
+        : null;
+
+    if (capabilityRequest) {
+      if (!storefrontBotId) {
+        throw new RuntimeMessageError(
+          "Le bot storefront n’est pas configuré.",
+          503,
+          "RUNTIME_STOREFRONT_BOT_NOT_CONFIGURED"
+        );
+      }
+      const result = await executeStorefrontCapability(
+        storefrontBotId,
+        capabilityRequest
+      );
+      replies = safeRasaReplies([storefrontCapabilityReply(result)]);
+    } else if (context.assistant.llmEnabled) {
       try {
         const result = await generateLiteLlmReply({
           assistant: {
@@ -318,11 +617,24 @@ export async function executeRuntimeMessage(
             systemPrompt: context.assistant.llmSystemPrompt
           },
           message: input.text,
-          history: context.history,
+          history: context.history.map((historyMessage) => ({
+            ...historyMessage,
+            text: safeRuntimeText(historyMessage.text)
+          })),
           nlu,
-          rasaReplies
+          rasaReplies: replies,
+          ...(input.channel === "storefront"
+            ? {
+                timeoutMs: STOREFRONT_LITELLM_TIMEOUT_MS,
+                maxResponseBytes:
+                  STOREFRONT_LITELLM_MAX_RESPONSE_BYTES
+              }
+            : {})
         });
-        replies = withGeneratedText(rasaReplies, result.text);
+        replies = withGeneratedText(
+          replies,
+          safeRuntimeText(result.text, UNSAFE_RESPONSE_REPLACEMENT)
+        );
         generation = result.metadata;
       } catch (error) {
         generation = {
@@ -339,45 +651,16 @@ export async function executeRuntimeMessage(
     }
 
     const latencyMs = Date.now() - startedAt;
-    const summary = nluSummary(nlu);
-
-    await db.$transaction([
-      db.message.update({
-        where: { id: message.id },
-        data: {
-          intent: summary.intent,
-          confidence: summary.confidence,
-          latencyMs,
-          isFallback: summary.isFallback,
-          payload: payload({
-            version: 1,
-            state: "COMPLETED",
-            replies,
-            nlu,
-            generation
-          })
-        }
-      }),
-      ...(replies.length
-        ? [
-            db.message.createMany({
-              data: replies.map((reply) => ({
-                conversationId: message.conversationId,
-                direction: "OUTBOUND" as const,
-                text: reply.text ?? "Réponse enrichie",
-                payload: json({ ...reply, generation })
-              }))
-            })
-          ]
-        : []),
-      db.conversation.update({
-        where: { id: message.conversationId },
-        data: { lastMessageAt: new Date() }
-      })
-    ]);
+    await completeMessage({
+      message,
+      replies,
+      nlu,
+      generation,
+      latencyMs
+    });
 
     return {
-      requestId: input.requestId,
+      requestId: input.publicRequestId,
       conversationId: message.conversationId,
       replies,
       nlu,
@@ -387,18 +670,31 @@ export async function executeRuntimeMessage(
     };
   } catch (error) {
     const latencyMs = Date.now() - startedAt;
-    const publicError = publicRasaError(error);
-    await db.message.update({
-      where: { id: message.id },
-      data: {
-        latencyMs,
-        payload: payload({
-          version: 1,
-          state: "FAILED",
-          error: publicError
-        })
-      }
-    });
-    throw error;
+    const failure = safeRuntimeFailure(error);
+    try {
+      await db.message.update({
+        where: { id: message.id },
+        data: {
+          latencyMs,
+          payload: payload({
+            version: 1,
+            state: "FAILED",
+            error: {
+              error: failure.message,
+              code: failure.code
+            }
+          })
+        }
+      });
+    } catch {
+      throw new RuntimeMessageError(
+        "Le résultat n’a pas pu être enregistré.",
+        500,
+        "RUNTIME_STORAGE_FAILED"
+      );
+    }
+    throw failure;
+  } finally {
+    await externalLease?.release();
   }
 }
