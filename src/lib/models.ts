@@ -17,7 +17,7 @@ export async function activateModelArtifact(
   });
   if (!artifact) throw new Error("Model artifact not found.");
 
-  const status = await activateRasaArtifact(artifact.id);
+  const status = await activateRasaArtifact(artifact.id, artifact.filename);
   const activatedAt = new Date();
 
   await db.$transaction(async (tx) => {

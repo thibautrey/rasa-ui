@@ -32,6 +32,9 @@ type RasaRequestOptions = {
 
 const DEFAULT_JSON_RESPONSE_BYTES = 512 * 1024;
 const MAX_ERROR_RESPONSE_BYTES = 16 * 1024;
+const MODEL_ACTIVATION_TIMEOUT_MS = 30_000;
+const MODEL_ACTIVATION_POLL_INTERVAL_MS = 500;
+const MODEL_STATUS_REQUEST_TIMEOUT_MS = 5_000;
 
 export class RasaApiError extends Error {
   constructor(
@@ -367,7 +370,10 @@ function modelDownloadSettings(artifactId: string) {
   };
 }
 
-export async function activateRasaArtifact(artifactId: string) {
+export async function activateRasaArtifact(
+  artifactId: string,
+  expectedFilename: string
+) {
   await rasaFetch(
     "/model",
     {
@@ -380,14 +386,47 @@ export async function activateRasaArtifact(artifactId: string) {
     { timeoutMs: 360_000 }
   );
 
-  const status = await getRasaStatus();
-  if (!status.model_file) {
-    throw new RasaApiError(
-      "Rasa accepted the model but did not report a loaded model.",
-      502,
-      status,
-      "MODEL_NOT_READY"
-    );
+  const deadline = Date.now() + MODEL_ACTIVATION_TIMEOUT_MS;
+  let lastStatus: RasaStatus | undefined;
+  let lastError: RasaApiError | undefined;
+
+  while (Date.now() < deadline) {
+    try {
+      const remainingMs = deadline - Date.now();
+      lastStatus = await getRasaStatus(
+        Math.max(1, Math.min(MODEL_STATUS_REQUEST_TIMEOUT_MS, remainingMs))
+      );
+      const loadedFilename = lastStatus.model_file?.split(/[\\/]/).pop();
+      if (loadedFilename === expectedFilename) return lastStatus;
+    } catch (error) {
+      if (
+        !(error instanceof RasaApiError) ||
+        (error.code !== "RASA_TIMEOUT" && error.code !== "RASA_UNREACHABLE")
+      ) {
+        throw error;
+      }
+      lastError = error;
+    }
+
+    const remainingMs = deadline - Date.now();
+    if (remainingMs > 0) {
+      await new Promise((resolve) =>
+        setTimeout(
+          resolve,
+          Math.min(MODEL_ACTIVATION_POLL_INTERVAL_MS, remainingMs)
+        )
+      );
+    }
   }
-  return status;
+
+  throw new RasaApiError(
+    "Rasa accepted the model but did not confirm the requested model file.",
+    504,
+    {
+      expectedFilename,
+      reportedFilename: lastStatus?.model_file ?? null,
+      lastErrorCode: lastError?.code
+    },
+    "MODEL_ACTIVATION_NOT_CONFIRMED"
+  );
 }
