@@ -58,7 +58,10 @@ export async function POST(request: NextRequest, context: Context) {
     validateAssistantDocuments(documents);
 
     const assistant = await db.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${id}))`;
+      await tx.$queryRaw`
+        SELECT TRUE AS "locked"
+        FROM pg_advisory_xact_lock(hashtext(${id}))
+      `;
       const latest = await tx.assistantRevision.aggregate({
         where: { assistantId: id },
         _max: { version: true }
