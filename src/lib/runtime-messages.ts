@@ -2,6 +2,12 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import {
+  generateLiteLlmReply,
+  liteLlmErrorCode,
+  liteLlmModel,
+  type GenerationMetadata
+} from "@/lib/litellm";
+import {
   parseMessage,
   publicRasaError,
   sendRestMessage,
@@ -24,6 +30,7 @@ type RuntimeEnvelope = {
   state: "PROCESSING" | "COMPLETED" | "FAILED";
   replies?: RasaReply[];
   nlu?: RasaParseResult;
+  generation?: GenerationMetadata;
   error?: {
     error: string;
     code: string;
@@ -39,6 +46,7 @@ export type RuntimeMessageResult = {
   nlu: RasaParseResult;
   latencyMs: number;
   cached: boolean;
+  generation?: GenerationMetadata;
 };
 
 export class RuntimeMessageError extends Error {
@@ -170,7 +178,8 @@ function cachedResult(
     replies: runtime.replies,
     nlu: cachedNlu,
     latencyMs: existing.latencyMs ?? 0,
-    cached: true
+    cached: true,
+    generation: runtime.generation
   };
 }
 
@@ -223,6 +232,52 @@ async function createInbound(input: RuntimeMessageInput) {
   }
 }
 
+async function generationContext(
+  assistantId: string,
+  conversationId: string,
+  messageId: string
+) {
+  const [assistant, history] = await Promise.all([
+    db.assistant.findUniqueOrThrow({
+      where: { id: assistantId },
+      select: {
+        name: true,
+        description: true,
+        language: true,
+        llmEnabled: true,
+        llmSystemPrompt: true
+      }
+    }),
+    db.message.findMany({
+      where: {
+        conversationId,
+        id: { not: messageId }
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: 12,
+      select: {
+        direction: true,
+        text: true
+      }
+    })
+  ]);
+
+  return {
+    assistant,
+    history: history.reverse()
+  };
+}
+
+function withGeneratedText(replies: RasaReply[], text: string): RasaReply[] {
+  const textReplyIndex = replies.findIndex(
+    (reply) => typeof reply.text === "string"
+  );
+  if (textReplyIndex === -1) return [{ text }, ...replies];
+  return replies.map((reply, index) =>
+    index === textReplyIndex ? { ...reply, text } : reply
+  );
+}
+
 export async function executeRuntimeMessage(
   input: RuntimeMessageInput
 ): Promise<RuntimeMessageResult> {
@@ -238,13 +293,51 @@ export async function executeRuntimeMessage(
   }
 
   try {
-    const [replies, nlu] = await Promise.all([
+    const [rasaReplies, nlu, context] = await Promise.all([
       sendRestMessage(input.senderId, input.text, {
         ...input.metadata,
         requestId: input.requestId
       }),
-      parseMessage(input.text)
+      parseMessage(input.text),
+      generationContext(input.assistantId, message.conversationId, message.id)
     ]);
+    let replies = rasaReplies;
+    let generation: GenerationMetadata = {
+      provider: "litellm",
+      model: liteLlmModel(),
+      status: "DISABLED"
+    };
+
+    if (context.assistant.llmEnabled) {
+      try {
+        const result = await generateLiteLlmReply({
+          assistant: {
+            name: context.assistant.name,
+            description: context.assistant.description,
+            language: context.assistant.language,
+            systemPrompt: context.assistant.llmSystemPrompt
+          },
+          message: input.text,
+          history: context.history,
+          nlu,
+          rasaReplies
+        });
+        replies = withGeneratedText(rasaReplies, result.text);
+        generation = result.metadata;
+      } catch (error) {
+        generation = {
+          provider: "litellm",
+          model: liteLlmModel(),
+          status: "RASA_FALLBACK",
+          errorCode: liteLlmErrorCode(error)
+        };
+        console.warn("LiteLLM generation fell back to Rasa.", {
+          requestId: input.requestId,
+          errorCode: generation.errorCode
+        });
+      }
+    }
+
     const latencyMs = Date.now() - startedAt;
     const summary = nluSummary(nlu);
 
@@ -260,7 +353,8 @@ export async function executeRuntimeMessage(
             version: 1,
             state: "COMPLETED",
             replies,
-            nlu
+            nlu,
+            generation
           })
         }
       }),
@@ -271,7 +365,7 @@ export async function executeRuntimeMessage(
                 conversationId: message.conversationId,
                 direction: "OUTBOUND" as const,
                 text: reply.text ?? "Réponse enrichie",
-                payload: json(reply)
+                payload: json({ ...reply, generation })
               }))
             })
           ]
@@ -288,7 +382,8 @@ export async function executeRuntimeMessage(
       replies,
       nlu,
       latencyMs,
-      cached: false
+      cached: false,
+      generation
     };
   } catch (error) {
     const latencyMs = Date.now() - startedAt;

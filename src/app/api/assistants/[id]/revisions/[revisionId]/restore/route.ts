@@ -9,6 +9,8 @@ type Context = {
 };
 
 type Documents = {
+  llmEnabled: boolean;
+  llmSystemPrompt: string;
   configYaml: string;
   domainYaml: string;
   nluYaml: string;
@@ -18,12 +20,17 @@ type Documents = {
   credentialsYaml: string;
 };
 
-function documentsFrom(value: unknown): Documents {
+type GenerationSettings = Pick<Documents, "llmEnabled" | "llmSystemPrompt">;
+
+function documentsFrom(
+  value: unknown,
+  current: GenerationSettings
+): Documents {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Invalid revision snapshot.");
   }
   const source = value as Record<string, unknown>;
-  const fields: Array<keyof Documents> = [
+  const fields = [
     "configYaml",
     "domainYaml",
     "nluYaml",
@@ -31,8 +38,8 @@ function documentsFrom(value: unknown): Documents {
     "rulesYaml",
     "endpointsYaml",
     "credentialsYaml"
-  ];
-  return Object.fromEntries(
+  ] as const;
+  const yaml = Object.fromEntries(
     fields.map((field) => {
       const entry = source[field];
       if (typeof entry !== "string") {
@@ -40,7 +47,18 @@ function documentsFrom(value: unknown): Documents {
       }
       return [field, entry];
     })
-  ) as Documents;
+  ) as Omit<Documents, keyof GenerationSettings>;
+  return {
+    ...yaml,
+    llmEnabled:
+      typeof source.llmEnabled === "boolean"
+        ? source.llmEnabled
+        : current.llmEnabled,
+    llmSystemPrompt:
+      typeof source.llmSystemPrompt === "string"
+        ? source.llmSystemPrompt
+        : current.llmSystemPrompt
+  };
 }
 
 export async function POST(request: NextRequest, context: Context) {
@@ -51,10 +69,16 @@ export async function POST(request: NextRequest, context: Context) {
   try {
     assertSameOrigin(request);
     const { id, revisionId } = await context.params;
-    const revision = await db.assistantRevision.findFirstOrThrow({
-      where: { id: revisionId, assistantId: id }
-    });
-    const documents = documentsFrom(revision.documents);
+    const [revision, current] = await Promise.all([
+      db.assistantRevision.findFirstOrThrow({
+        where: { id: revisionId, assistantId: id }
+      }),
+      db.assistant.findUniqueOrThrow({
+        where: { id },
+        select: { llmEnabled: true, llmSystemPrompt: true }
+      })
+    ]);
+    const documents = documentsFrom(revision.documents, current);
     validateAssistantDocuments(documents);
 
     const assistant = await db.$transaction(async (tx) => {

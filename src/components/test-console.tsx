@@ -16,6 +16,12 @@ type ChatMessage = {
   text: string;
 };
 
+type GenerationMetadata = {
+  provider: "litellm";
+  model: string;
+  status: "GENERATED" | "RASA_FALLBACK" | "DISABLED";
+};
+
 function sessionId() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return `studio-${crypto.randomUUID()}`;
@@ -30,6 +36,9 @@ export function TestConsole({ assistantId }: { assistantId: string }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [nlu, setNlu] = useState<Record<string, unknown> | null>(null);
+  const [generation, setGeneration] = useState<GenerationMetadata | null>(
+    null
+  );
 
   const intent = useMemo(() => {
     const value = nlu?.intent;
@@ -67,6 +76,7 @@ export function TestConsole({ assistantId }: { assistantId: string }) {
         throw new Error(chat.error ?? "Le serveur Rasa ne répond pas.");
       }
       setNlu(chat.nlu ?? null);
+      setGeneration(chat.generation ?? null);
       setMessages((current) => [
         ...current,
         ...(chat.replies.length
@@ -98,6 +108,7 @@ export function TestConsole({ assistantId }: { assistantId: string }) {
     setSender(sessionId());
     setMessages([]);
     setNlu(null);
+    setGeneration(null);
     setError("");
   }
 
@@ -180,6 +191,14 @@ export function TestConsole({ assistantId }: { assistantId: string }) {
               <span>Intention détectée</span>
               <strong>{intent ?? "Non déterminée"}</strong>
             </div>
+            {generation ? (
+              <div className="nlu-intent">
+                <span>Génération · {generation.status}</span>
+                <strong>
+                  {generation.provider} · {generation.model}
+                </strong>
+              </div>
+            ) : null}
             <pre>{JSON.stringify(nlu, null, 2)}</pre>
           </>
         ) : (

@@ -56,6 +56,8 @@ export async function POST(request: NextRequest) {
       `assistant_id: ${slug}`
     ).replace("language: fr", `language: ${input.language}`);
     const documents = {
+      llmEnabled: true,
+      llmSystemPrompt: "",
       configYaml,
       domainYaml: DEFAULT_DOMAIN_YAML,
       nluYaml: DEFAULT_NLU_YAML,

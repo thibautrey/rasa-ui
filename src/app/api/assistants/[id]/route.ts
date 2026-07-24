@@ -49,6 +49,8 @@ export async function PUT(request: NextRequest, context: Context) {
     validateAssistantDocuments(input);
     const { changeNote, ...values } = input;
     const documents = {
+      llmEnabled: values.llmEnabled,
+      llmSystemPrompt: values.llmSystemPrompt,
       configYaml: values.configYaml,
       domainYaml: values.domainYaml,
       nluYaml: values.nluYaml,

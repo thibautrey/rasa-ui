@@ -40,6 +40,8 @@ type AssistantPayload = {
   description: string;
   language: string;
   slug: string;
+  llmEnabled: boolean;
+  llmSystemPrompt: string;
   configYaml: string;
   domainYaml: string;
   nluYaml: string;
@@ -70,6 +72,7 @@ const tabs = [
   { id: "stories", label: "Stories", icon: Network },
   { id: "rules", label: "Règles", icon: ShieldCheck },
   { id: "config", label: "Pipeline", icon: Settings2 },
+  { id: "ai", label: "IA générative", icon: Sparkles },
   { id: "endpoints", label: "Connexions", icon: FileCode2 },
   { id: "history", label: "Révisions", icon: History },
   { id: "test", label: "Tester", icon: MessageSquareText }
@@ -195,6 +198,8 @@ export function AssistantWorkspace({
           name: assistant.name,
           description: assistant.description,
           language: assistant.language,
+          llmEnabled: assistant.llmEnabled,
+          llmSystemPrompt: assistant.llmSystemPrompt,
           configYaml: assistant.configYaml,
           domainYaml: assistant.domainYaml,
           nluYaml: assistant.nluYaml,
@@ -497,6 +502,67 @@ export function AssistantWorkspace({
                   />
                 </details>
               ) : null}
+            </div>
+          ) : null}
+          {tab === "ai" ? (
+            <div className="llm-settings">
+              <div className="editor-intro">
+                <div>
+                  <p className="eyebrow">Génération augmentée</p>
+                  <h3>Réponses LiteLLM</h3>
+                  <p>
+                    Rasa conserve la compréhension, les règles et le suivi de
+                    conversation. Le modèle reformule sa réponse avec le
+                    contexte récent.
+                  </p>
+                </div>
+                <span className="pill">
+                  <Sparkles /> gpt-5.6-luna
+                </span>
+              </div>
+
+              <label className="llm-toggle-card">
+                <input
+                  checked={assistant.llmEnabled}
+                  disabled={!editable}
+                  onChange={(event) =>
+                    patch({ llmEnabled: event.target.checked })
+                  }
+                  type="checkbox"
+                />
+                <span aria-hidden="true" className="llm-switch">
+                  <i />
+                </span>
+                <span className="llm-toggle-copy">
+                  <strong>Activer la génération LiteLLM</strong>
+                  <span>
+                    En cas d’indisponibilité, la réponse Rasa est renvoyée
+                    automatiquement.
+                  </span>
+                </span>
+              </label>
+
+              <div className="field llm-prompt-field">
+                <label htmlFor="assistant-llm-prompt">
+                  Instructions système
+                </label>
+                <textarea
+                  className="textarea mono llm-prompt"
+                  id="assistant-llm-prompt"
+                  maxLength={20_000}
+                  onChange={(event) =>
+                    patch({ llmSystemPrompt: event.target.value })
+                  }
+                  placeholder="Ton, limites métier, informations fiables et règles de réponse…"
+                  readOnly={!editable}
+                  spellCheck={false}
+                  value={assistant.llmSystemPrompt}
+                />
+                <span className="llm-prompt-count">
+                  {assistant.llmSystemPrompt.length.toLocaleString("fr-FR")} /
+                  20 000 caractères
+                </span>
+              </div>
             </div>
           ) : null}
           {tab === "history" ? (

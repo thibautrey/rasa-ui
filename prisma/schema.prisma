@@ -48,6 +48,8 @@ model Assistant {
   slug            String              @unique
   description     String              @default("")
   language        String              @default("en")
+  llmEnabled      Boolean             @default(true) @map("llm_enabled")
+  llmSystemPrompt String              @default("") @map("llm_system_prompt") @db.Text
   configYaml      String              @map("config_yaml") @db.Text
   domainYaml      String              @map("domain_yaml") @db.Text
   nluYaml         String              @map("nlu_yaml") @db.Text

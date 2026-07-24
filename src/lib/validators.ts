@@ -10,6 +10,8 @@ export const assistantUpdateSchema = z.object({
   name: z.string().trim().min(2).max(80),
   description: z.string().trim().max(500),
   language: z.string().trim().min(2).max(12),
+  llmEnabled: z.boolean(),
+  llmSystemPrompt: z.string().trim().max(20_000),
   configYaml: z.string().min(1).max(500_000),
   domainYaml: z.string().min(1).max(500_000),
   nluYaml: z.string().min(1).max(1_000_000),

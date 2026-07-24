@@ -106,7 +106,8 @@ export async function POST(request: NextRequest, context: Context) {
         requestId: result.requestId,
         replies: result.replies,
         latencyMs: result.latencyMs,
-        cached: result.cached
+        cached: result.cached,
+        generation: result.generation
       },
       { headers: cors(origin) }
     );
