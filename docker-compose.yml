@@ -101,6 +101,7 @@ services:
       start_period: 5s
 
 volumes:
+  # Explicit names let GitHub-backed Coolify applications reuse preserved data.
   rasa-ui-postgres:
     name: ${RASA_UI_POSTGRES_VOLUME_NAME}
   rasa-ui-redis:

@@ -98,6 +98,7 @@ services:
       retries: 4
       start_period: 15s
     volumes:
+      # Coolify supplies absolute host paths; the runtime receives read-only files.
       - runtime-public-socket:/run/runtime-public
       - runtime-broker-socket:/run/runtime-broker:ro
       - runtime-redis-socket:/run/runtime-redis:ro
