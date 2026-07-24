@@ -1,0 +1,221 @@
+x-runtime-image: &runtime-image
+  image: ${RUNTIME_IMAGE:-pleiades/rasa-storefront-runtime:local}
+  build:
+    context: ${RUNTIME_BUILD_CONTEXT:-.}
+    dockerfile: Dockerfile
+    target: runtime
+
+x-runtime-security: &runtime-security
+  read_only: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  init: true
+  user: "1000:1000"
+  group_add:
+    - "2000"
+  pids_limit: 80
+  mem_limit: 256m
+  cpus: 0.75
+  tmpfs:
+    - /tmp:size=16m,mode=0700,uid=1000,gid=1000
+  restart: unless-stopped
+
+services:
+  runtime-ingress:
+    image: ${RUNTIME_INGRESS_IMAGE:-pleiades/rasa-storefront-ingress:local}
+    build:
+      context: ${RUNTIME_BUILD_CONTEXT:-.}
+      dockerfile: Dockerfile
+      target: ingress
+    user: "101:101"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    pids_limit: 40
+    mem_limit: 64m
+    cpus: 0.25
+    restart: unless-stopped
+    entrypoint:
+      - nginx
+    command:
+      - -g
+      - daemon off;
+    tmpfs:
+      - /tmp:size=16m,mode=0700,uid=101,gid=101
+    expose:
+      - "3000"
+    depends_on:
+      runtime-public:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - -O
+        - /dev/null
+        - http://127.0.0.1:3000/healthz
+      interval: 15s
+      timeout: 3s
+      retries: 4
+      start_period: 15s
+    volumes:
+      - runtime-public-socket:/run/runtime-public:ro
+
+  runtime-public:
+    <<:
+      - *runtime-image
+      - *runtime-security
+    network_mode: none
+    command:
+      - node
+      - dist/public-server.js
+    environment:
+      NODE_ENV: production
+      STOREFRONT_WIDGET_ENABLED: ${STOREFRONT_WIDGET_ENABLED:-false}
+      RUNTIME_PUBLIC_ORIGIN: ${RUNTIME_PUBLIC_ORIGIN:?RUNTIME_PUBLIC_ORIGIN is required}
+      RUNTIME_BOT_CONFIG_JSON: ${RUNTIME_BOT_CONFIG_JSON:?RUNTIME_BOT_CONFIG_JSON is required}
+      RASA_FLOW_PROXY_KEY_ID: ${RASA_FLOW_PROXY_KEY_ID:?RASA_FLOW_PROXY_KEY_ID is required}
+      RASA_FLOW_PROXY_TIMEOUT_MS: ${RASA_FLOW_PROXY_TIMEOUT_MS:-25000}
+    depends_on:
+      runtime-redis:
+        condition: service_healthy
+      runtime-rasa-proxy:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - require("node:http").get({socketPath:"/run/runtime-public/public.sock",path:"/healthz"},r=>process.exit(r.statusCode===200?0:1)).on("error",()=>process.exit(1))
+      interval: 15s
+      timeout: 3s
+      retries: 4
+      start_period: 15s
+    volumes:
+      - runtime-public-socket:/run/runtime-public
+      - runtime-broker-socket:/run/runtime-broker:ro
+      - runtime-redis-socket:/run/runtime-redis:ro
+      - ./run/secrets/runtime-public-redis-password:/run/secrets/runtime-public-redis-password:ro
+      - ./run/secrets/flow-proxy-secret:/run/secrets/flow-proxy-secret:ro
+
+  runtime-rasa-proxy:
+    <<:
+      - *runtime-image
+      - *runtime-security
+    command:
+      - node
+      - dist/rasa-proxy.js
+    environment:
+      NODE_ENV: production
+      FLOW_PROXY_ENABLED: ${FLOW_PROXY_ENABLED:-false}
+      FLOW_PROXY_RATE_LIMIT_PER_MINUTE: ${FLOW_PROXY_RATE_LIMIT_PER_MINUTE:-120}
+      FLOW_PROXY_BOT_ID: ${FLOW_PROXY_BOT_ID:?FLOW_PROXY_BOT_ID is required}
+      RASA_FLOW_PROXY_KEY_ID: ${RASA_FLOW_PROXY_KEY_ID:?RASA_FLOW_PROXY_KEY_ID is required}
+      RUNTIME_BOT_CONFIG_JSON: ${RUNTIME_BOT_CONFIG_JSON:?RUNTIME_BOT_CONFIG_JSON is required}
+      RASA_BASE_URL: ${RASA_BASE_URL:?RASA_BASE_URL is required}
+      RASA_REQUEST_TIMEOUT_MS: ${RASA_REQUEST_TIMEOUT_MS:-3000}
+      STOREFRONT_CAPABILITIES_BASE_URL: ${STOREFRONT_CAPABILITIES_BASE_URL:?STOREFRONT_CAPABILITIES_BASE_URL is required}
+      STOREFRONT_CAPABILITIES_KEY_ID: ${STOREFRONT_CAPABILITIES_KEY_ID:?STOREFRONT_CAPABILITIES_KEY_ID is required}
+      STOREFRONT_CAPABILITIES_TIMEOUT_MS: ${STOREFRONT_CAPABILITIES_TIMEOUT_MS:-10000}
+    depends_on:
+      runtime-redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - require("node:http").get({socketPath:"/run/runtime-broker/broker.sock",path:"/healthz"},r=>process.exit(r.statusCode===200?0:1)).on("error",()=>process.exit(1))
+      interval: 15s
+      timeout: 3s
+      retries: 4
+      start_period: 15s
+    volumes:
+      - runtime-broker-socket:/run/runtime-broker
+      - runtime-redis-socket:/run/runtime-redis:ro
+      - ./run/secrets/runtime-broker-redis-password:/run/secrets/runtime-broker-redis-password:ro
+      - ./run/secrets/flow-proxy-secret:/run/secrets/flow-proxy-secret:ro
+      - ./run/secrets/rasa-jwt-private-key.pem:/run/secrets/rasa-jwt-private-key.pem:ro
+      - ./run/secrets/storefront-capabilities-secret:/run/secrets/storefront-capabilities-secret:ro
+
+  runtime-redis:
+    image: ${RUNTIME_REDIS_IMAGE:-pleiades/rasa-storefront-redis:local}
+    build:
+      context: ${RUNTIME_BUILD_CONTEXT:-.}
+      dockerfile: Dockerfile
+      target: redis
+    network_mode: none
+    user: "999:999"
+    group_add:
+      - "2000"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 50
+    mem_limit: 160m
+    cpus: 0.5
+    restart: unless-stopped
+    entrypoint:
+      - sh
+      - -ec
+    command:
+      - |
+        umask 077
+        public_password="$$(cat /run/secrets/runtime-public-redis-password)"
+        broker_password="$$(cat /run/secrets/runtime-broker-redis-password)"
+        test "$${#public_password}" -ge 32
+        test "$${#public_password}" -le 128
+        test "$${#broker_password}" -ge 32
+        test "$${#broker_password}" -le 128
+        case "$$public_password$$broker_password" in *[!A-Za-z0-9_-]*) exit 1 ;; esac
+        rm -f /run/runtime-redis/redis.sock
+        {
+          printf 'protected-mode yes\n'
+          printf 'port 0\n'
+          printf 'unixsocket /run/runtime-redis/redis.sock\n'
+          printf 'unixsocketperm 666\n'
+          printf 'user default off\n'
+          printf 'user runtime_public on resetpass >%s resetkeys ~runtime:quota:* ~runtime:session:* ~runtime:request:* ~runtime:turn:* ~runtime:lease:* -@all +ping +get +set +del +exists +incr +expire +eval +client|setinfo\n' "$$public_password"
+          printf 'user runtime_broker on resetpass >%s resetkeys ~runtime:flow:* -@all +ping +set +exists +incr +expire +eval +client|setinfo\n' "$$broker_password"
+          printf 'dir /data\n'
+          printf 'appendonly yes\n'
+          printf 'appendfsync everysec\n'
+          printf 'save ""\n'
+          printf 'maxmemory 128mb\n'
+          printf 'maxmemory-policy noeviction\n'
+          printf 'rename-command FLUSHALL ""\n'
+          printf 'rename-command FLUSHDB ""\n'
+          printf 'rename-command CONFIG ""\n'
+          printf 'rename-command KEYS ""\n'
+        } > /tmp/redis.conf
+        unset public_password broker_password
+        exec redis-server /tmp/redis.conf
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - redis-cli -s /run/runtime-redis/redis.sock --no-auth-warning --user runtime_broker --pass "$$(cat /run/secrets/runtime-broker-redis-password)" ping | grep -qx PONG
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    tmpfs:
+      - /tmp:size=2m,mode=0700,uid=999,gid=999
+    volumes:
+      - runtime-redis-data:/data
+      - runtime-redis-socket:/run/runtime-redis
+      - ./run/secrets/runtime-public-redis-password:/run/secrets/runtime-public-redis-password:ro
+      - ./run/secrets/runtime-broker-redis-password:/run/secrets/runtime-broker-redis-password:ro
+
+volumes:
+  runtime-public-socket:
+  runtime-broker-socket:
+  runtime-redis-socket:
+  runtime-redis-data:
