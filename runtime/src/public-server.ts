@@ -37,6 +37,7 @@ import {
   requestBrokerTurn,
   type FlowClientConfiguration,
 } from "./upstreams.js";
+import { RUNTIME_RELEASE } from "./release.js";
 
 const MAX_PUBLIC_BODY_BYTES = 2 * 1_024;
 const PUBLIC_SOCKET_PATH = "/run/runtime-public/public.sock";
@@ -427,6 +428,7 @@ async function routeRequest(
       {
         status: redisHealthy ? "ok" : "unavailable",
         enabled: settings.enabled,
+        release: RUNTIME_RELEASE,
       },
     );
     return;

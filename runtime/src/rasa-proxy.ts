@@ -37,6 +37,7 @@ import {
   type CapabilityConfiguration,
   type RasaConfiguration,
 } from "./upstreams.js";
+import { RUNTIME_RELEASE } from "./release.js";
 
 const FLOW_PATH = "/v1/turn";
 const MAX_FLOW_BODY_BYTES = 2 * 1_024;
@@ -193,6 +194,7 @@ async function routeRequest(
     writeJson(response, redisHealthy ? 200 : 503, {
       status: redisHealthy ? "ok" : "unavailable",
       enabled: settings.enabled,
+      release: RUNTIME_RELEASE,
     });
     return;
   }
