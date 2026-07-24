@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum TrainingStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+model User {
+  id           String              @id @default(cuid())
+  email        String              @unique
+  name         String
+  passwordHash String              @map("password_hash")
+  role         UserRole            @default(EDITOR)
+  isActive     Boolean             @default(true) @map("is_active")
+  assistants   Assistant[]
+  revisions    AssistantRevision[]
+  auditLogs    AuditLog[]
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Assistant {
+  id              String              @id @default(cuid())
+  name            String
+  slug            String              @unique
+  description     String              @default("")
+  language        String              @default("en")
+  configYaml      String              @map("config_yaml") @db.Text
+  domainYaml      String              @map("domain_yaml") @db.Text
+  nluYaml         String              @map("nlu_yaml") @db.Text
+  storiesYaml     String              @map("stories_yaml") @db.Text
+  rulesYaml       String              @map("rules_yaml") @db.Text
+  endpointsYaml   String              @map("endpoints_yaml") @db.Text
+  credentialsYaml String              @map("credentials_yaml") @db.Text
+  activeModel     String?             @map("active_model")
+  createdById     String              @map("created_by_id")
+  createdBy       User                @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  trainingRuns    TrainingRun[]
+  revisions       AssistantRevision[]
+  modelArtifacts  ModelArtifact[]
+  storeBots       StoreBot[]
+  conversations   Conversation[]
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  @@index([createdById])
+  @@map("assistants")
+}
+
+model TrainingRun {
+  id                  String         @id @default(cuid())
+  assistantId         String         @map("assistant_id")
+  assistant           Assistant      @relation(fields: [assistantId], references: [id], onDelete: Cascade)
+  status              TrainingStatus @default(QUEUED)
+  modelName           String?        @map("model_name")
+  log                 String         @default("") @db.Text
+  sourceSnapshot      Json           @map("source_snapshot")
+  sourceHash          String         @map("source_hash")
+  deployAfterTraining Boolean        @default(true) @map("deploy_after_training")
+  attempts            Int            @default(0)
+  workerId            String?        @map("worker_id")
+  leaseUntil          DateTime?      @map("lease_until")
+  heartbeatAt         DateTime?      @map("heartbeat_at")
+  errorCode           String?        @map("error_code")
+  deploymentError     String?        @map("deployment_error") @db.Text
+  artifact            ModelArtifact?
+  startedAt           DateTime?      @map("started_at")
+  finishedAt          DateTime?      @map("finished_at")
+  createdAt           DateTime       @default(now()) @map("created_at")
+
+  @@index([assistantId, createdAt])
+  @@index([status, leaseUntil, createdAt])
+  @@map("training_runs")
+}
+
+model AssistantRevision {
+  id          String    @id @default(cuid())
+  assistantId String    @map("assistant_id")
+  assistant   Assistant @relation(fields: [assistantId], references: [id], onDelete: Cascade)
+  version     Int
+  documents   Json
+  note        String    @default("")
+  createdById String    @map("created_by_id")
+  createdBy   User      @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@unique([assistantId, version])
+  @@index([assistantId, createdAt])
+  @@map("assistant_revisions")
+}
+
+model ModelArtifact {
+  id            String      @id @default(cuid())
+  assistantId   String      @map("assistant_id")
+  assistant     Assistant   @relation(fields: [assistantId], references: [id], onDelete: Cascade)
+  trainingRunId String      @unique @map("training_run_id")
+  trainingRun   TrainingRun @relation(fields: [trainingRunId], references: [id], onDelete: Cascade)
+  filename      String
+  sha256        String
+  sizeBytes     BigInt      @map("size_bytes")
+  archive       Bytes
+  active        Boolean     @default(false)
+  rasaModelId   String?     @map("rasa_model_id")
+  rasaModelFile String?     @map("rasa_model_file")
+  activatedAt   DateTime?   @map("activated_at")
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  @@index([assistantId, createdAt])
+  @@index([active])
+  @@map("model_artifacts")
+}
+
+model StoreBot {
+  id             String         @id @default(cuid())
+  assistantId    String         @map("assistant_id")
+  assistant      Assistant      @relation(fields: [assistantId], references: [id], onDelete: Cascade)
+  name           String
+  publicKey      String         @unique @map("public_key")
+  allowedOrigins Json           @map("allowed_origins")
+  primaryColor   String         @default("#7c5cff") @map("primary_color")
+  accentColor    String         @default("#35d0ba") @map("accent_color")
+  position       String         @default("right")
+  welcomeMessage String         @default("Bonjour ! Comment puis-je vous aider ?") @map("welcome_message")
+  placeholder    String         @default("Écrivez votre message…")
+  launcherLabel  String         @default("Besoin d'aide ?") @map("launcher_label")
+  avatarUrl      String?        @map("avatar_url")
+  locale         String         @default("fr")
+  enabled        Boolean        @default(true)
+  conversations  Conversation[]
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  @@index([assistantId])
+  @@map("store_bots")
+}
+
+model Conversation {
+  id            String    @id @default(cuid())
+  assistantId   String    @map("assistant_id")
+  assistant     Assistant @relation(fields: [assistantId], references: [id], onDelete: Cascade)
+  storeBotId    String?   @map("store_bot_id")
+  storeBot      StoreBot? @relation(fields: [storeBotId], references: [id], onDelete: SetNull)
+  senderId      String    @map("sender_id")
+  channel       String    @default("studio")
+  messages      Message[]
+  reviewedAt    DateTime? @map("reviewed_at")
+  rating        Int?
+  metadata      Json?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  lastMessageAt DateTime  @default(now()) @map("last_message_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@unique([assistantId, senderId])
+  @@index([lastMessageAt])
+  @@map("conversations")
+}
+
+model Message {
+  id             String           @id @default(cuid())
+  conversationId String           @map("conversation_id")
+  conversation   Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  direction      MessageDirection
+  text           String           @db.Text
+  payload        Json?
+  requestId      String?          @unique @map("request_id")
+  intent         String?
+  confidence     Float?
+  latencyMs      Int?             @map("latency_ms")
+  isFallback     Boolean          @default(false) @map("is_fallback")
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?  @map("actor_id")
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("audit_logs")
+}

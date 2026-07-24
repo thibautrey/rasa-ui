@@ -1,0 +1,18 @@
+node_modules
+.next
+.env
+.env.*
+!.env.example
+coverage
+*.log
+*.tsbuildinfo
+.DS_Store
+data
+prisma/dev.db*
+
+# CCE (code-context-engine)
+# CCE local cache (per-machine, not for version control)
+.cce/
+.claude/
+.mcp.json
+CLAUDE.md

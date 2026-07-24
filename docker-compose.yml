@@ -1,0 +1,66 @@
+services:
+  app:
+    build:
+      context: .
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://rasa_ui:${SERVICE_PASSWORD_POSTGRES:?SERVICE_PASSWORD_POSTGRES is required}@database:5432/rasa_ui?schema=public
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL is required}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
+      RASA_BASE_URL: ${RASA_BASE_URL:?RASA_BASE_URL is required}
+      RASA_API_TOKEN: ${RASA_API_TOKEN:?RASA_API_TOKEN is required}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:?NEXT_PUBLIC_APP_URL is required}
+      INTERNAL_MODEL_SERVER_URL: ${INTERNAL_MODEL_SERVER_URL:?INTERNAL_MODEL_SERVER_URL is required}
+      MODEL_DOWNLOAD_TOKEN: ${MODEL_DOWNLOAD_TOKEN:?MODEL_DOWNLOAD_TOKEN is required}
+      RASA_TRAINING_TIMEOUT_MS: ${RASA_TRAINING_TIMEOUT_MS:-1800000}
+      TRAINING_WORKER_ENABLED: ${TRAINING_WORKER_ENABLED:-true}
+    extra_hosts:
+      - "${RASA_ORIGIN_HOST:-rasa.pleiades.solutions}:${RASA_ORIGIN_IP:-host-gateway}"
+    ports:
+      - "3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "--fail",
+          "--silent",
+          "--show-error",
+          "--max-time",
+          "3",
+          "http://127.0.0.1:3000/api/health"
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+
+  database:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rasa_ui
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES:?SERVICE_PASSWORD_POSTGRES is required}
+      POSTGRES_DB: rasa_ui
+    volumes:
+      - rasa-ui-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "pg_isready",
+          "--host=127.0.0.1",
+          "--username=rasa_ui",
+          "--dbname=rasa_ui"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+volumes:
+  rasa-ui-postgres:

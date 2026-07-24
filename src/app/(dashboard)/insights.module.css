@@ -1,0 +1,426 @@
+.filters {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.5fr) minmax(150px, 0.65fr) minmax(180px, 0.8fr) auto;
+  align-items: end;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 18px;
+}
+
+.filterField {
+  display: grid;
+  gap: 7px;
+}
+
+.filterField label {
+  color: var(--text-soft);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.filterActions {
+  display: flex;
+  gap: 8px;
+}
+
+.resultSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 2px 10px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.conversationList {
+  display: grid;
+  gap: 10px;
+}
+
+.conversationRow {
+  display: grid;
+  grid-template-columns: minmax(210px, 0.8fr) minmax(260px, 1.5fr) auto;
+  align-items: center;
+  gap: 22px;
+  padding: 17px 19px;
+  transition: 160ms ease;
+}
+
+.conversationRow:hover {
+  border-color: rgba(139, 108, 255, 0.34);
+  background:
+    linear-gradient(140deg, rgba(139, 108, 255, 0.07), transparent 44%),
+    var(--panel-hover);
+  transform: translateY(-1px);
+}
+
+.conversationIdentity,
+.conversationPreview,
+.conversationMeta {
+  min-width: 0;
+}
+
+.conversationIdentity strong,
+.conversationIdentity span,
+.conversationPreview strong,
+.conversationPreview span,
+.conversationMeta span,
+.conversationMeta time {
+  display: block;
+}
+
+.conversationIdentity strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversationIdentity span {
+  overflow: hidden;
+  margin-top: 5px;
+  color: var(--text-muted);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversationPreview strong {
+  color: var(--text-soft);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.conversationPreview span {
+  overflow: hidden;
+  margin-top: 5px;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversationMeta {
+  display: grid;
+  min-width: 138px;
+  justify-items: end;
+  gap: 7px;
+}
+
+.conversationMeta span,
+.conversationMeta time {
+  color: var(--text-muted);
+  font-size: 9px;
+}
+
+.channelLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.backLink:hover {
+  color: var(--text);
+}
+
+.backLink svg {
+  width: 14px;
+}
+
+.detailMetrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.detailMetric {
+  min-width: 0;
+  padding: 16px;
+}
+
+.detailMetric span,
+.detailMetric strong {
+  display: block;
+}
+
+.detailMetric span {
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.detailMetric strong {
+  overflow: hidden;
+  margin-top: 8px;
+  color: var(--text-soft);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transcript {
+  padding: 22px;
+}
+
+.transcriptHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 16px;
+}
+
+.transcriptHead h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.transcriptHead span {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.messageList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.message {
+  width: min(720px, 86%);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.messageInbound {
+  align-self: flex-start;
+  border-bottom-left-radius: 4px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.messageOutbound {
+  align-self: flex-end;
+  border-color: rgba(139, 108, 255, 0.24);
+  border-bottom-right-radius: 4px;
+  background: rgba(139, 108, 255, 0.11);
+}
+
+.messageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  color: var(--text-muted);
+  font-size: 9px;
+}
+
+.messageHeader strong {
+  color: var(--text-soft);
+  font-size: 9px;
+}
+
+.messageText {
+  margin: 8px 0 0;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chartCard {
+  margin-top: 18px;
+  padding: 22px;
+}
+
+.chartViewport {
+  overflow-x: auto;
+  padding: 4px 0 2px;
+}
+
+.chart {
+  display: grid;
+  min-width: 760px;
+  height: 210px;
+  grid-template-columns: repeat(30, minmax(12px, 1fr));
+  align-items: end;
+  gap: 6px;
+}
+
+.chartDay {
+  display: grid;
+  height: 100%;
+  grid-template-rows: minmax(0, 1fr) 20px;
+  align-items: end;
+  gap: 7px;
+}
+
+.barTrack {
+  display: flex;
+  height: 166px;
+  align-items: flex-end;
+  justify-content: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.bar {
+  width: min(15px, 75%);
+  min-height: 2px;
+  border-radius: 5px 5px 2px 2px;
+  background: linear-gradient(180deg, var(--accent), var(--primary));
+  box-shadow: 0 0 16px rgba(49, 214, 189, 0.13);
+}
+
+.chartLabel {
+  min-height: 16px;
+  color: #60798c;
+  font-size: 8px;
+  text-align: center;
+}
+
+.breakdowns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.breakdownCard {
+  padding: 20px;
+}
+
+.breakdownList {
+  display: grid;
+}
+
+.breakdownRow {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding: 13px 1px;
+}
+
+.breakdownLine {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.breakdownLine div {
+  min-width: 0;
+}
+
+.breakdownLine strong,
+.breakdownLine span {
+  display: block;
+}
+
+.breakdownLine strong {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.breakdownLine span {
+  overflow: hidden;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.breakdownLine > strong {
+  color: var(--text-soft);
+  font-size: 11px;
+}
+
+.progress {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+}
+
+.emptyCompact {
+  display: grid;
+  min-height: 130px;
+  place-items: center;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 10px;
+  text-align: center;
+}
+
+@media (max-width: 1100px) {
+  .filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .conversationRow {
+    grid-template-columns: minmax(180px, 0.8fr) minmax(240px, 1.2fr);
+  }
+
+  .conversationMeta {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, auto);
+    justify-content: space-between;
+    justify-items: start;
+  }
+
+  .breakdowns {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 800px) {
+  .filters,
+  .conversationRow,
+  .detailMetrics {
+    grid-template-columns: 1fr;
+  }
+
+  .filterActions {
+    flex-wrap: wrap;
+  }
+
+  .conversationMeta {
+    grid-column: auto;
+  }
+
+  .resultSummary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .message {
+    width: 94%;
+  }
+}

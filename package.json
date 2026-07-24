@@ -1,0 +1,37 @@
+{
+  "name": "@pleiades/rasa-ui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Open source control plane and storefront widget builder for Rasa.",
+  "license": "MIT",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate deploy",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "bcryptjs": "3.0.2",
+    "jose": "6.1.2",
+    "lucide-react": "0.468.0",
+    "next": "16.2.11",
+    "prisma": "6.19.3",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "yaml": "2.9.0",
+    "zod": "4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "22.18.10",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "eslint": "9.39.1",
+    "eslint-config-next": "16.2.11",
+    "typescript": "5.9.3"
+  }
+}
