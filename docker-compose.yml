@@ -102,4 +102,6 @@ services:
 
 volumes:
   rasa-ui-postgres:
+    name: ${RASA_UI_POSTGRES_VOLUME_NAME:-rasa-ui-postgres}
   rasa-ui-redis:
+    name: ${RASA_UI_REDIS_VOLUME_NAME:-rasa-ui-redis}
