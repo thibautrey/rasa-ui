@@ -101,8 +101,8 @@ services:
       - runtime-public-socket:/run/runtime-public
       - runtime-broker-socket:/run/runtime-broker:ro
       - runtime-redis-socket:/run/runtime-redis:ro
-      - ${RUNTIME_SECRETS_DIR:-./run/secrets}/runtime-public-redis-password:/run/secrets/runtime-public-redis-password:ro
-      - ${RUNTIME_SECRETS_DIR:-./run/secrets}/flow-proxy-secret:/run/secrets/flow-proxy-secret:ro
+      - ${RUNTIME_PUBLIC_REDIS_PASSWORD_FILE}:/run/secrets/runtime-public-redis-password:ro
+      - ${RASA_FLOW_PROXY_SECRET_FILE}:/run/secrets/flow-proxy-secret:ro
 
   runtime-rasa-proxy:
     <<:
@@ -139,10 +139,10 @@ services:
     volumes:
       - runtime-broker-socket:/run/runtime-broker
       - runtime-redis-socket:/run/runtime-redis:ro
-      - ${RUNTIME_SECRETS_DIR:-./run/secrets}/runtime-broker-redis-password:/run/secrets/runtime-broker-redis-password:ro
-      - ${RUNTIME_SECRETS_DIR:-./run/secrets}/flow-proxy-secret:/run/secrets/flow-proxy-secret:ro
-      - ${RUNTIME_SECRETS_DIR:-./run/secrets}/rasa-jwt-private-key.pem:/run/secrets/rasa-jwt-private-key.pem:ro
-      - ${RUNTIME_SECRETS_DIR:-./run/secrets}/storefront-capabilities-secret:/run/secrets/storefront-capabilities-secret:ro
+      - ${RUNTIME_BROKER_REDIS_PASSWORD_FILE}:/run/secrets/runtime-broker-redis-password:ro
+      - ${RASA_FLOW_PROXY_SECRET_FILE}:/run/secrets/flow-proxy-secret:ro
+      - ${RASA_JWT_PRIVATE_KEY_FILE}:/run/secrets/rasa-jwt-private-key.pem:ro
+      - ${STOREFRONT_CAPABILITIES_SECRET_FILE}:/run/secrets/storefront-capabilities-secret:ro
 
   runtime-redis:
     image: ${RUNTIME_REDIS_IMAGE:-pleiades/rasa-storefront-redis:local}
@@ -211,8 +211,8 @@ services:
     volumes:
       - runtime-redis-data:/data
       - runtime-redis-socket:/run/runtime-redis
-      - ${RUNTIME_SECRETS_DIR:-./run/secrets}/runtime-public-redis-password:/run/secrets/runtime-public-redis-password:ro
-      - ${RUNTIME_SECRETS_DIR:-./run/secrets}/runtime-broker-redis-password:/run/secrets/runtime-broker-redis-password:ro
+      - ${RUNTIME_PUBLIC_REDIS_PASSWORD_FILE}:/run/secrets/runtime-public-redis-password:ro
+      - ${RUNTIME_BROKER_REDIS_PASSWORD_FILE}:/run/secrets/runtime-broker-redis-password:ro
 
 volumes:
   runtime-public-socket:
