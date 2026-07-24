@@ -663,6 +663,13 @@ export async function runRasaFlow(
     16 * 1_024,
   );
   requirePredictedAction(nextPrediction, "action_listen");
+  await rasaJson(
+    configuration,
+    sender,
+    `${conversationPath}/execute?include_events=NONE`,
+    JSON.stringify({ name: "action_listen" }),
+    32 * 1_024,
+  );
 
   return {
     version: 1,
