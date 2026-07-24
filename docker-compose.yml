@@ -10,7 +10,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://rasa_ui:${SERVICE_PASSWORD_POSTGRES:?SERVICE_PASSWORD_POSTGRES is required}@database:5432/rasa_ui?schema=public
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       REDIS_PASSWORD: ${SERVICE_PASSWORD_REDIS:?SERVICE_PASSWORD_REDIS is required}
       AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required}
       WIDGET_SESSION_SECRET: ${WIDGET_SESSION_SECRET:?WIDGET_SESSION_SECRET is required}
