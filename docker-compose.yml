@@ -34,6 +34,9 @@ services:
       STOREFRONT_CAPABILITIES_BOT_ID: ${STOREFRONT_CAPABILITIES_BOT_ID:-}
     extra_hosts:
       - "${RASA_ORIGIN_HOST:-rasa.pleiades.solutions}:${RASA_ORIGIN_IP:-host-gateway}"
+    networks:
+      - default
+      - rasa
     ports:
       - "3000"
     healthcheck:
@@ -103,3 +106,8 @@ services:
 volumes:
   rasa-ui-postgres:
   rasa-ui-redis:
+
+networks:
+  rasa:
+    external: true
+    name: ${RASA_NETWORK_NAME:-nxfxk3yhbyfduocvyuxgsd5z}
