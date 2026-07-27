@@ -72,8 +72,7 @@ const catalogGuidanceModeSchema = z.enum([
   "availability",
   "comparison",
   "compatibility",
-  "recommendation",
-  "technical"
+  "recommendation"
 ]);
 
 const catalogGuidanceRequestSchema = z
@@ -611,11 +610,7 @@ const intentCapabilities = {
     mode: "comparison"
   },
   ask_sky_forecast: "sky.forecast",
-  ask_sky_events: "sky.events",
-  ask_technical_help: {
-    capability: "catalog.guidance",
-    mode: "technical"
-  }
+  ask_sky_events: "sky.events"
 } as const;
 
 function record(value: unknown): Record<string, unknown> | null {

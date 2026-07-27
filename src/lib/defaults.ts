@@ -85,11 +85,11 @@ responses:
   utter_delivery_policy:
     - text: "Je peux expliquer les informations publiques de livraison, mais pas promettre une date ou un tarif absent des données disponibles."
   utter_payment_policy:
-    - text: "Je peux expliquer les moyens de paiement affichés par la boutique, sans consulter ni modifier un paiement personnel."
+    - text: "Je peux expliquer les moyens de paiement et promotions affichés publiquement par la boutique, sans consulter ni modifier un paiement personnel. L’existence d’un code promotionnel actif ou son éligibilité doit être vérifiée dans les offres actuellement publiées ou dans le panier."
   utter_order_account:
     - text: "Les commandes et paiements personnels doivent être consultés depuis l’espace client sécurisé."
   utter_return_policy:
-    - text: "Je peux expliquer les règles publiques de retour. Un dossier individuel doit être ouvert depuis l’espace client ou le support sécurisé."
+    - text: "Pour un achat de consommateur dans l’Union européenne, le délai légal de rétractation est en principe de 14 jours après réception, sous réserve des exceptions. L’emballage d’origine est recommandé, mais les conditions exactes, les frais et l’adresse de retour doivent être vérifiés dans la politique de retour de la boutique. En France, la garantie légale de conformité d’un bien neuf est en principe de deux ans. Un dossier individuel doit être ouvert depuis l’espace client ou le support sécurisé."
   utter_after_sales:
     - text: "Je peux proposer un diagnostic sans danger. Un dossier SAV et ses pièces jointes doivent passer par le support sécurisé."
   utter_technical_help:
@@ -97,7 +97,7 @@ responses:
   utter_sky_forecast:
     - text: "Indiquez une ville ou des coordonnées approximatives pour obtenir une prévision d’observation."
   utter_sky_events:
-    - text: "Indiquez une ville ou des coordonnées approximatives et la période souhaitée."
+    - text: "Pour calculer les objets ou événements visibles, utilisez la ville ou les coordonnées approximatives et la période déjà présentes dans le message. La localisation et la période sont toutes deux nécessaires ; demandez séparément chaque information absente sans redemander celles qui sont déjà fournies."
   utter_observation_advice:
     - text: "Je peux proposer des conseils d’observation généraux et sûrs à partir de votre lieu et de votre équipement."
   utter_account:

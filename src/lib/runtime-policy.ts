@@ -1,5 +1,9 @@
 export type RuntimePolicyDecision = {
-  intent: "auth_required" | "human_contact_required" | "secure_support_required";
+  intent:
+    | "auth_required"
+    | "human_contact_required"
+    | "secure_support_required"
+    | "solar_safety";
   reply: string;
 };
 
@@ -11,6 +15,9 @@ const SECURE_SUPPORT_REQUIRED_REPLY =
 
 const HUMAN_CONTACT_REQUIRED_REPLY =
   "Cette demande nécessite une prise en charge par l’équipe commerciale ou le support. Utilisez le canal de contact officiel du site ; aucun devis, abonnement, notification ou modification n’a été créé depuis ce chat.";
+
+const SOLAR_SAFETY_REPLY =
+  "Pour toute observation solaire, utilisez uniquement un filtre solaire certifié adapté au modèle et au diamètre exacts, solidement placé à l’ouverture de l’instrument — jamais à l’oculaire. N’observez jamais le Soleil sans protection adaptée, y compris pendant une éclipse. Pour l’observation sans instrument, utilisez des lunettes d’éclipse conformes à la norme ISO 12312-2 ; elles ne protègent pas derrière un télescope, des jumelles ou un chercheur. Si la référence ou le diamètre de l’équipement n’est pas certain, ne l’utilisez pas pour viser le Soleil.";
 
 const authRequiredPatterns = [
   /\b(?:affiche|montre|liste|retrouve|verifie|consulte)\b.{0,50}\b(?:mes?|ma|mon)\s+(?:commandes?|paiements?|factures?|achats?|abonnements?|credits?|points?)\b/u,
@@ -36,7 +43,7 @@ const authRequiredPatterns = [
 const secureSupportPatterns = [
   /\b(?:arrive|recu|colis)\b.{0,60}\b(?:casse|endommage|incomplet|mauvais|manque|perdu)\b/u,
   /\b(?:il manque|piece manquante|accessoire recu n.est pas le bon)\b/u,
-  /\b(?:ouvrir|creer|declarer)\b.{0,50}\b(?:demande de sav|dossier sav|retour|produit endommage)\b/u,
+  /\b(?:ouvr\w*|cre\w*|declar\w*)\b.{0,50}\b(?:demande de sav|dossier sav|retour|produit endommage)\b/u,
   /\b(?:etiquette de retour|envoyer uniquement la piece|retourner tout le produit)\b/u,
   /\b(?:transporteur indique livre|suivi ne bouge|colis semble perdu)\b/u,
   /\b(?:je souhaite|je veux)\b.{0,30}\bretourner\b.{0,30}\bproduit\b/u,
@@ -72,6 +79,12 @@ export function runtimePolicyDecision(
   text: string
 ): RuntimePolicyDecision | null {
   const value = normalized(text);
+  if (/\b(?:eclipse|soleil|solaire)\b/u.test(value)) {
+    return {
+      intent: "solar_safety",
+      reply: SOLAR_SAFETY_REPLY
+    };
+  }
   if (matches(value, authRequiredPatterns)) {
     return {
       intent: "auth_required",
