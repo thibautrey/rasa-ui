@@ -77,11 +77,11 @@ responses:
   utter_product_advice:
     - text: "Je vais rechercher les références et connaissances produit pertinentes sans inventer de caractéristique."
   utter_compatibility:
-    - text: "Indiquez les références exactes des deux équipements pour que je puisse vérifier les informations disponibles."
+    - text: "Indiquez uniquement la référence ou la dimension encore manquante ; sans cela, la compatibilité ne peut pas être confirmée."
   utter_product_comparison:
-    - text: "Indiquez les références exactes à comparer et votre usage principal."
+    - text: "Indiquez uniquement les références ou familles qui ne sont pas déjà nommées ; la comparaison s’appuiera sur leurs caractéristiques publiées."
   utter_availability:
-    - text: "Je vais vérifier le catalogue. Indiquez le modèle ou le SKU si le produit n’est pas identifiable."
+    - text: "Indiquez le modèle ou le SKU du produit ; aucun stock ni délai ne peut être affirmé sans résultat catalogue actuel."
   utter_delivery_policy:
     - text: "Je peux expliquer les informations publiques de livraison, mais pas promettre une date ou un tarif absent des données disponibles."
   utter_payment_policy:
@@ -103,7 +103,7 @@ responses:
   utter_account:
     - text: "Les données et actions de compte sont accessibles uniquement depuis l’espace client sécurisé."
   utter_membership:
-    - text: "Je peux expliquer les avantages publics ; le statut personnel et les crédits nécessitent l’espace client sécurisé."
+    - text: "Je peux expliquer uniquement les avantages publiquement documentés ; le statut personnel ou l’éligibilité d’une commande nécessitent l’espace client sécurisé."
   utter_professional:
     - text: "Les demandes de devis, club, école, partenariat ou affiliation doivent être transmises à l’équipe commerciale par le canal officiel."
   utter_default:
