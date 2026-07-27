@@ -257,6 +257,37 @@ function enforceSolarSafety(value: string) {
   return complete ? value : `${value}\n\n${SOLAR_SAFETY_NOTICE}`;
 }
 
+function enforceCompatibilityClarification(
+  input: GenerateReplyInput,
+  value: string
+) {
+  if (
+    input.nlu.intent?.name !== "ask_compatibility" ||
+    !input.assistant.language.toLocaleLowerCase().startsWith("fr")
+  ) {
+    return value;
+  }
+  const message = input.message
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .toLocaleLowerCase("fr")
+    .replace(/[’']/g, " ");
+
+  if (
+    /\b(?:cette|ma|une)\s+camera\b/u.test(message) &&
+    /\b(?:ce|mon|un)\s+telescope\b/u.test(message)
+  ) {
+    return "Pour vérifier cette compatibilité, indiquez les références exactes de la caméra et du télescope. Sans les deux modèles, je ne peux pas confirmer les connexions mécaniques, le tirage, le pilotage ni les adaptateurs nécessaires.";
+  }
+  if (
+    /\b(?:cette|ma|une)\s+monture\b/u.test(message) &&
+    /\b(?:ce|mon|un)\s+tube\b/u.test(message)
+  ) {
+    return "Pour vérifier si la monture supporte le tube, indiquez le modèle exact de la monture et le poids total du tube équipé, accessoires compris. Si ce poids n’est pas connu, indiquez le modèle du tube et les accessoires principaux ; la marge de charge doit être plus prudente en astrophotographie qu’en observation visuelle.";
+  }
+  return value;
+}
+
 async function readBoundedJsonResponse(
   response: Response,
   maxBytes: number
@@ -355,7 +386,10 @@ export async function generateLiteLlmReply(input: GenerateReplyInput) {
   }
 
   const body = await readBoundedJsonResponse(response, maxResponseBytes);
-  const text = enforceSolarSafety(responseText(body));
+  const text = enforceCompatibilityClarification(
+    input,
+    enforceSolarSafety(responseText(body))
+  );
   if (!text) {
     throw new LiteLlmError(
       "LiteLLM returned an empty response.",
