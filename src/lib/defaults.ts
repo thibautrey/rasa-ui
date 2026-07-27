@@ -95,9 +95,9 @@ responses:
   utter_technical_help:
     - text: "Décrivez le modèle exact, le symptôme et le test déjà effectué, sans transmettre de donnée personnelle."
   utter_sky_forecast:
-    - text: "Indiquez une ville ou des coordonnées approximatives pour obtenir une prévision d’observation."
+    - text: "Une localisation approximative et une date ou période sont nécessaires pour une prévision d’observation. Utilisez celles déjà présentes dans le message et demandez en une seule réponse uniquement toutes les informations manquantes, sans redemander celles qui sont déjà fournies."
   utter_sky_events:
-    - text: "Pour calculer les objets ou événements visibles, utilisez la ville ou les coordonnées approximatives et la période déjà présentes dans le message. La localisation et la période sont toutes deux nécessaires ; demandez séparément chaque information absente sans redemander celles qui sont déjà fournies."
+    - text: "Une localisation approximative et une date ou période sont nécessaires pour calculer les objets ou événements visibles. Utilisez celles déjà présentes dans le message et demandez en une seule réponse uniquement toutes les informations manquantes, sans redemander celles qui sont déjà fournies."
   utter_observation_advice:
     - text: "Je peux proposer des conseils d’observation généraux et sûrs à partir de votre lieu et de votre équipement."
   utter_account:
