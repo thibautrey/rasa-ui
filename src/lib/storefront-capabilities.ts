@@ -68,7 +68,29 @@ const skyEventsRequestSchema = z
   })
   .strict();
 
+const catalogGuidanceModeSchema = z.enum([
+  "availability",
+  "comparison",
+  "compatibility",
+  "recommendation",
+  "technical"
+]);
+
+const catalogGuidanceRequestSchema = z
+  .object({
+    capability: z.literal("catalog.guidance"),
+    input: z
+      .object({
+        mode: catalogGuidanceModeSchema,
+        query: z.string().trim().min(3).max(500),
+        limit: z.number().int().min(1).max(6).optional()
+      })
+      .strict()
+  })
+  .strict();
+
 const storefrontCapabilityRequestSchema = z.discriminatedUnion("capability", [
+  catalogGuidanceRequestSchema,
   skyForecastRequestSchema,
   skyEventsRequestSchema
 ]);
@@ -216,9 +238,44 @@ const skyEventsResponseSchema = z
   })
   .strict();
 
+const catalogGuidanceResponseSchema = z
+  .object({
+    capability: z.literal("catalog.guidance"),
+    answer: plainTextSchema(1_500).min(1),
+    data: z
+      .object({
+        mode: catalogGuidanceModeSchema,
+        products: z
+          .array(
+            z
+              .object({
+                name: plainTextSchema(180),
+                variant: plainTextSchema(160).nullable(),
+                sku: plainTextSchema(120).nullable(),
+                vendor: plainTextSchema(120).nullable(),
+                price: z.number().finite().min(0).nullable(),
+                availability: z.enum([
+                  "available",
+                  "limited",
+                  "unavailable"
+                ]),
+                url: z.string().url().max(1_000).nullable()
+              })
+              .strict()
+          )
+          .max(6),
+      })
+      .strict()
+  })
+  .strict();
+
 const storefrontCapabilityResponseSchema = z.discriminatedUnion(
   "capability",
-  [skyForecastResponseSchema, skyEventsResponseSchema]
+  [
+    catalogGuidanceResponseSchema,
+    skyForecastResponseSchema,
+    skyEventsResponseSchema
+  ]
 );
 
 export type StorefrontCapabilityResponse = z.infer<
@@ -326,6 +383,10 @@ function normalizedRequest(input: unknown): StorefrontCapabilityRequest {
       "STOREFRONT_CAPABILITY_INVALID_INPUT",
       400
     );
+  }
+
+  if (request.capability === "catalog.guidance") {
+    return request;
   }
 
   if (request.capability === "sky.forecast") {
@@ -514,6 +575,7 @@ const rasaActionSchema = z
   .object({
     type: z.literal("storefront_capability"),
     action: z.enum([
+      "action_storefront_catalog_guidance",
       "action_storefront_sky_forecast",
       "action_storefront_sky_events"
     ]),
@@ -522,13 +584,38 @@ const rasaActionSchema = z
   .strict();
 
 const actionCapabilities = {
+  action_storefront_catalog_guidance: "catalog.guidance",
   action_storefront_sky_forecast: "sky.forecast",
   action_storefront_sky_events: "sky.events"
 } as const;
 
 const intentCapabilities = {
+  ask_availability: {
+    capability: "catalog.guidance",
+    mode: "availability"
+  },
+  ask_compatibility: {
+    capability: "catalog.guidance",
+    mode: "compatibility"
+  },
+  ask_product: {
+    capability: "catalog.guidance",
+    mode: "recommendation"
+  },
+  ask_product_advice: {
+    capability: "catalog.guidance",
+    mode: "recommendation"
+  },
+  ask_product_comparison: {
+    capability: "catalog.guidance",
+    mode: "comparison"
+  },
   ask_sky_forecast: "sky.forecast",
-  ask_sky_events: "sky.events"
+  ask_sky_events: "sky.events",
+  ask_technical_help: {
+    capability: "catalog.guidance",
+    mode: "technical"
+  }
 } as const;
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -575,9 +662,22 @@ function boundedString(value: unknown, maxLength: number) {
 }
 
 function requestFromIntent(
-  capability: (typeof intentCapabilities)[keyof typeof intentCapabilities],
+  intentCapability: (typeof intentCapabilities)[keyof typeof intentCapabilities],
   nlu: RasaParseResult
 ): StorefrontCapabilityRequest | null {
+  if (typeof intentCapability !== "string") {
+    const query = boundedString(nlu.text, 500);
+    return query
+      ? {
+          capability: intentCapability.capability,
+          input: {
+            mode: intentCapability.mode,
+            query
+          }
+        }
+      : null;
+  }
+  const capability = intentCapability;
   const latitude = finiteNumber(
     entityValue(nlu, ["latitude", "lat"])
   );
@@ -701,9 +801,11 @@ export function resolveStorefrontCapabilityRequest(
 
   const intentName =
     typeof nlu.intent?.name === "string" ? nlu.intent.name : "";
-  const capability =
+  const intentCapability =
     intentCapabilities[intentName as keyof typeof intentCapabilities];
-  return capability ? requestFromIntent(capability, nlu) : null;
+  return intentCapability
+    ? requestFromIntent(intentCapability, nlu)
+    : null;
 }
 
 export function storefrontCapabilityReply(
