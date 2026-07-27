@@ -610,59 +610,65 @@ export async function executeRuntimeMessage(
         },
         entities: []
       };
-    } else if (capabilityRequest) {
-      if (!storefrontBotId) {
-        throw new RuntimeMessageError(
-          "Le bot storefront n’est pas configuré.",
-          503,
-          "RUNTIME_STOREFRONT_BOT_NOT_CONFIGURED"
+    } else {
+      if (capabilityRequest) {
+        if (!storefrontBotId) {
+          throw new RuntimeMessageError(
+            "Le bot storefront n’est pas configuré.",
+            503,
+            "RUNTIME_STOREFRONT_BOT_NOT_CONFIGURED"
+          );
+        }
+        const result = await executeStorefrontCapability(
+          storefrontBotId,
+          capabilityRequest
         );
+        replies = safeRasaReplies([
+          storefrontCapabilityReply(result)
+        ]);
       }
-      const result = await executeStorefrontCapability(
-        storefrontBotId,
-        capabilityRequest
-      );
-      replies = safeRasaReplies([storefrontCapabilityReply(result)]);
-    } else if (context.assistant.llmEnabled) {
-      try {
-        const result = await generateLiteLlmReply({
-          assistant: {
-            name: context.assistant.name,
-            description: context.assistant.description,
-            language: context.assistant.language,
-            systemPrompt: context.assistant.llmSystemPrompt
-          },
-          message: input.text,
-          history: context.history.map((historyMessage) => ({
-            ...historyMessage,
-            text: safeRuntimeText(historyMessage.text)
-          })),
-          nlu,
-          rasaReplies: replies,
-          ...(input.channel === "storefront"
-            ? {
-                timeoutMs: STOREFRONT_LITELLM_TIMEOUT_MS,
-                maxResponseBytes:
-                  STOREFRONT_LITELLM_MAX_RESPONSE_BYTES
-              }
-            : {})
-        });
-        replies = withGeneratedText(
-          replies,
-          safeRuntimeText(result.text, UNSAFE_RESPONSE_REPLACEMENT)
-        );
-        generation = result.metadata;
-      } catch (error) {
-        generation = {
-          provider: "litellm",
-          model: liteLlmModel(),
-          status: "RASA_FALLBACK",
-          errorCode: liteLlmErrorCode(error)
-        };
-        console.warn("LiteLLM generation fell back to Rasa.", {
-          requestId: input.requestId,
-          errorCode: generation.errorCode
-        });
+
+      if (context.assistant.llmEnabled) {
+        try {
+          const result = await generateLiteLlmReply({
+            assistant: {
+              name: context.assistant.name,
+              description: context.assistant.description,
+              language: context.assistant.language,
+              systemPrompt: context.assistant.llmSystemPrompt
+            },
+            message: input.text,
+            history: context.history.map((historyMessage) => ({
+              ...historyMessage,
+              text: safeRuntimeText(historyMessage.text)
+            })),
+            nlu,
+            rasaReplies: replies,
+            ...(input.channel === "storefront"
+              ? {
+                  timeoutMs: STOREFRONT_LITELLM_TIMEOUT_MS,
+                  maxResponseBytes:
+                    STOREFRONT_LITELLM_MAX_RESPONSE_BYTES
+                }
+              : {})
+          });
+          replies = withGeneratedText(
+            replies,
+            safeRuntimeText(result.text, UNSAFE_RESPONSE_REPLACEMENT)
+          );
+          generation = result.metadata;
+        } catch (error) {
+          generation = {
+            provider: "litellm",
+            model: liteLlmModel(),
+            status: "RASA_FALLBACK",
+            errorCode: liteLlmErrorCode(error)
+          };
+          console.warn("LiteLLM generation fell back to Rasa.", {
+            requestId: input.requestId,
+            errorCode: generation.errorCode
+          });
+        }
       }
     }
 
