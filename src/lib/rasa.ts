@@ -322,7 +322,7 @@ export async function trainRasaModel(documents: RasaDocuments) {
 export async function trainRasaYaml(yaml: string) {
   const timeoutMs = Number(process.env.RASA_TRAINING_TIMEOUT_MS ?? 1_800_000);
   const response = await rasaFetch(
-    "/model/train?save_to_default_model_directory=true&force_training=true",
+    "/model/train?save_to_default_model_directory=true",
     {
       method: "POST",
       headers: {
