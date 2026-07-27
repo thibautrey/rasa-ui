@@ -35,8 +35,10 @@ services:
     extra_hosts:
       - "${RASA_ORIGIN_HOST:-rasa.pleiades.solutions}:${RASA_ORIGIN_IP:-host-gateway}"
     networks:
-      - default
-      - rasa
+      default:
+      rasa:
+        aliases:
+          - rasa-studio
     ports:
       - "3000"
     healthcheck:
