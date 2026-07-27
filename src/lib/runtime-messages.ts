@@ -20,6 +20,7 @@ import {
   runtimePseudonym,
   safeRuntimeText
 } from "@/lib/runtime-privacy";
+import { runtimePolicyDecision } from "@/lib/runtime-policy";
 import {
   executeStorefrontCapability,
   resolveStorefrontCapabilityRequest,
@@ -557,7 +558,10 @@ export async function executeRuntimeMessage(
       };
     }
 
-    if (input.channel === "storefront") {
+    if (
+      input.channel === "storefront" ||
+      (input.storeBotId && storefrontCapabilitiesEnabled())
+    ) {
       if (!input.storeBotId) {
         throw new RuntimeMessageError(
           "Le bot storefront n’est pas configuré.",
@@ -586,15 +590,27 @@ export async function executeRuntimeMessage(
       parseMessage(input.text, rasaOptions),
       generationContext(input.assistantId, message.conversationId, message.id)
     ]);
-    const nlu = publicNlu(rawNlu);
+    let nlu = publicNlu(rawNlu);
     let replies = safeRasaReplies(rawRasaReplies);
     let generation = disabledGeneration;
+    const policyDecision = runtimePolicyDecision(input.text);
     const capabilityRequest =
-      input.channel === "storefront" && storefrontCapabilitiesEnabled()
+      !policyDecision &&
+      input.storeBotId &&
+      storefrontCapabilitiesEnabled()
         ? resolveStorefrontCapabilityRequest(rawNlu, rawRasaReplies)
         : null;
 
-    if (capabilityRequest) {
+    if (policyDecision) {
+      replies = [{ text: policyDecision.reply }];
+      nlu = {
+        intent: {
+          name: policyDecision.intent,
+          confidence: 1
+        },
+        entities: []
+      };
+    } else if (capabilityRequest) {
       if (!storefrontBotId) {
         throw new RuntimeMessageError(
           "Le bot storefront n’est pas configuré.",

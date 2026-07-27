@@ -38,12 +38,29 @@ intents:
   - goodbye
   - affirm
   - deny
-  - ask_product
-  - ask_delivery
-  - ask_support
+  - ask_product_advice
+  - ask_compatibility
+  - ask_product_comparison
+  - ask_availability
+  - ask_delivery_policy
+  - ask_payment_policy
+  - ask_order_account
+  - ask_return_policy
+  - ask_after_sales
+  - ask_technical_help
+  - ask_sky_forecast
+  - ask_sky_events
+  - ask_observation_advice
+  - ask_account
+  - ask_membership
+  - ask_professional
 
 entities:
   - product
+  - city
+  - country
+  - latitude
+  - longitude
 
 slots:
   product:
@@ -57,10 +74,38 @@ responses:
     - text: "Bonjour ! Comment puis-je vous aider ?"
   utter_goodbye:
     - text: "À bientôt !"
-  utter_delivery:
-    - text: "Je peux vous aider à retrouver les informations de livraison."
-  utter_support:
-    - text: "Décrivez-moi votre problème et je vais vous orienter."
+  utter_product_advice:
+    - text: "Je vais rechercher les références et connaissances produit pertinentes sans inventer de caractéristique."
+  utter_compatibility:
+    - text: "Indiquez les références exactes des deux équipements pour que je puisse vérifier les informations disponibles."
+  utter_product_comparison:
+    - text: "Indiquez les références exactes à comparer et votre usage principal."
+  utter_availability:
+    - text: "Je vais vérifier le catalogue. Indiquez le modèle ou le SKU si le produit n’est pas identifiable."
+  utter_delivery_policy:
+    - text: "Je peux expliquer les informations publiques de livraison, mais pas promettre une date ou un tarif absent des données disponibles."
+  utter_payment_policy:
+    - text: "Je peux expliquer les moyens de paiement affichés par la boutique, sans consulter ni modifier un paiement personnel."
+  utter_order_account:
+    - text: "Les commandes et paiements personnels doivent être consultés depuis l’espace client sécurisé."
+  utter_return_policy:
+    - text: "Je peux expliquer les règles publiques de retour. Un dossier individuel doit être ouvert depuis l’espace client ou le support sécurisé."
+  utter_after_sales:
+    - text: "Je peux proposer un diagnostic sans danger. Un dossier SAV et ses pièces jointes doivent passer par le support sécurisé."
+  utter_technical_help:
+    - text: "Décrivez le modèle exact, le symptôme et le test déjà effectué, sans transmettre de donnée personnelle."
+  utter_sky_forecast:
+    - text: "Indiquez une ville ou des coordonnées approximatives pour obtenir une prévision d’observation."
+  utter_sky_events:
+    - text: "Indiquez une ville ou des coordonnées approximatives et la période souhaitée."
+  utter_observation_advice:
+    - text: "Je peux proposer des conseils d’observation généraux et sûrs à partir de votre lieu et de votre équipement."
+  utter_account:
+    - text: "Les données et actions de compte sont accessibles uniquement depuis l’espace client sécurisé."
+  utter_membership:
+    - text: "Je peux expliquer les avantages publics ; le statut personnel et les crédits nécessitent l’espace client sécurisé."
+  utter_professional:
+    - text: "Les demandes de devis, club, école, partenariat ou affiliation doivent être transmises à l’équipe commerciale par le canal officiel."
   utter_default:
     - text: "Je n'ai pas encore compris. Pouvez-vous reformuler ?"
 
@@ -83,21 +128,175 @@ nlu:
       - au revoir
       - à bientôt
       - bonne journée
-  - intent: ask_product
+  - intent: ask_product_advice
     examples: |
-      - je cherche un [télescope](product)
-      - avez-vous ce [produit](product) en stock
-      - pouvez-vous me conseiller un [oculaire](product)
-  - intent: ask_delivery
+      - Quel télescope me conseillez-vous pour débuter ?
+      - Quel télescope convient pour observer les planètes ?
+      - Je veux faire de l’astrophotographie avec un budget de 1 000 €.
+      - Ce télescope est-il adapté à un enfant ?
+      - Quel modèle est facile à transporter ?
+      - Quel télescope choisir depuis une ville très lumineuse ?
+      - Est-ce que je pourrai voir les galaxies avec ce modèle ?
+  - intent: ask_compatibility
     examples: |
-      - quels sont les délais de livraison
-      - où est ma commande
-      - combien coûte la livraison
-  - intent: ask_support
+      - Cette caméra est-elle compatible avec mon télescope ?
+      - Cet oculaire fonctionne-t-il avec un porte-oculaire 31,75 mm ?
+      - Cette monture peut-elle supporter mon tube ?
+      - Ce correcteur de coma est-il adapté à mon Newton ?
+      - Est-ce que cet adaptateur fonctionne avec mon appareil Canon ?
+      - Cette lunette est-elle compatible avec l’ASIAIR ?
+      - Puis-je installer ce Dobson sur un trépied ?
+      - Quel filtre solaire correspond au diamètre de mon télescope ?
+  - intent: ask_product_comparison
     examples: |
-      - j'ai besoin d'aide
-      - mon produit ne fonctionne pas
-      - je souhaite contacter le support
+      - Comparez ces deux télescopes.
+      - Quelle différence entre ces deux caméras ?
+      - Lequel est le meilleur pour le ciel profond ?
+      - Est-ce que le modèle plus cher vaut réellement la différence ?
+      - Quelle monture est la plus simple entre une EQ5 et une HEQ5 ?
+      - Quelle différence entre un Dobson 130/650 et un 150/750 ?
+  - intent: ask_availability
+    examples: |
+      - Ce produit est-il en stock ?
+      - Quand sera-t-il de nouveau disponible ?
+      - Pouvez-vous me prévenir lors du réapprovisionnement ?
+  - intent: ask_delivery_policy
+    examples: |
+      - Sera-t-il livré avant mon anniversaire ?
+      - Livrez-vous en Belgique, en Suisse ou en Suède ?
+      - Combien coûte la livraison ?
+      - Quel transporteur utilisez-vous ?
+      - La TVA est-elle incluse ?
+      - Comment fonctionne la TVA pour une livraison en Suisse ?
+  - intent: ask_payment_policy
+    examples: |
+      - Avez-vous un code promotionnel ?
+      - Puis-je payer en plusieurs fois ?
+      - Pourquoi mon code promotionnel ne fonctionne pas ?
+      - Je n’arrive pas à finaliser le paiement.
+      - Le paiement a-t-il bien été accepté ?
+  - intent: ask_order_account
+    examples: |
+      - Affiche mes commandes récentes.
+      - Vérifie si mon paiement a été reçu.
+      - Retrouve ma commande avec mon adresse email.
+      - Envoie-moi un nouveau lien de paiement.
+      - Puis-je modifier mon adresse avant de payer ?
+      - Puis-je ajouter un produit à ma commande ?
+      - Où est ma commande ?
+      - Ma commande a-t-elle été expédiée ?
+      - Donnez-moi mon numéro de suivi.
+      - Pourquoi le suivi ne bouge plus ?
+      - Quelle est la date estimée de livraison ?
+      - Mon colis semble perdu, que dois-je faire ?
+      - Le transporteur indique livré, mais je n’ai rien reçu.
+      - Je souhaite changer l’adresse de livraison.
+      - Je veux remplacer un produit par un autre.
+      - Ajoutez cet accessoire à ma commande.
+      - Je souhaite annuler ma commande.
+      - Puis-je changer le mode de livraison ?
+      - Télécharge ma facture.
+      - Modifiez le nom ou l’adresse sur la facture.
+      - Renvoyez-moi la confirmation de commande.
+      - Pouvez-vous fournir un justificatif de paiement ?
+  - intent: ask_return_policy
+    examples: |
+      - Je souhaite retourner un produit.
+      - Quel est le délai de rétractation ?
+      - Comment obtenir une étiquette de retour ?
+      - Où dois-je envoyer le produit ?
+      - Le produit doit-il être dans son emballage d’origine ?
+      - Combien coûte le retour ?
+      - Quelle est la durée de garantie ?
+  - intent: ask_after_sales
+    examples: |
+      - Mon produit est arrivé cassé.
+      - Il manque une pièce dans le colis.
+      - Le colis était endommagé à la réception.
+      - L’accessoire reçu n’est pas le bon.
+      - Pouvez-vous m’envoyer uniquement la pièce manquante ?
+      - Mon télescope ne fonctionne plus.
+      - Comment ouvrir une demande de SAV ?
+      - Dois-je retourner tout le produit ou seulement la pièce ?
+      - Où trouver le numéro de série ?
+      - Pouvez-vous diagnostiquer la panne avant un retour ?
+      - Où en est mon remboursement ?
+      - Quand vais-je recevoir l’argent ?
+      - Puis-je être remboursé sur un autre moyen de paiement ?
+      - Je préfère un avoir plutôt qu’un remboursement.
+  - intent: ask_technical_help
+    examples: |
+      - Comment monter ce télescope ?
+      - Comment équilibrer une monture équatoriale ?
+      - Comment installer le chercheur ?
+      - Comment faire la mise en station ?
+      - Comment connecter ma monture à mon téléphone ?
+      - Comment installer une caméra dans le porte-oculaire ?
+      - Pourquoi je ne vois rien dans l’oculaire ?
+      - Pourquoi l’image est-elle floue ?
+      - Pourquoi les étoiles ressemblent-elles à des traits ?
+      - Comment faire la mise au point ?
+      - Quel oculaire utiliser pour observer Jupiter ?
+      - Quel grossissement utiliser avec mon télescope ?
+      - Ma monture ne démarre pas.
+      - Un moteur ne tourne pas.
+      - L’application ne détecte pas la caméra.
+      - L’ASIAIR ne reconnaît pas ma monture.
+      - Je n’arrive pas à faire l’alignement polaire.
+      - Le suivi est mauvais.
+      - Mes images présentent du coma.
+      - J’ai de la buée sur la lentille.
+  - intent: ask_sky_forecast
+    examples: |
+      - Est-ce que la météo sera bonne pour observer ?
+      - La météo permet-elle d’observer ce soir à [Toulouse](city) ?
+      - Quel est le meilleur créneau d’observation à [Paris](city) ?
+  - intent: ask_sky_events
+    examples: |
+      - Que puis-je observer ce soir ?
+      - Quels objets sont visibles depuis [Toulouse](city) ?
+      - Quelle est la meilleure heure pour voir Saturne ?
+      - Comment préparer l’éclipse du 12 août 2026 ?
+  - intent: ask_observation_advice
+    examples: |
+      - Que puis-je voir avec un télescope de 130 mm ?
+      - Quels objets sont faciles pour un débutant ?
+      - Quel filtre utiliser pour cette nébuleuse ?
+      - Puis-je observer le Soleil avec cet équipement ?
+  - intent: ask_account
+    examples: |
+      - Modifie mon adresse.
+      - Change mon adresse email.
+      - Réinitialise mon mot de passe.
+      - Quels produits ai-je déjà achetés ?
+      - Quel matériel ai-je enregistré ?
+      - Ajoute ce télescope à mon équipement.
+      - Supprime mon compte.
+      - Quelles données avez-vous sur moi ?
+      - Désabonne-moi de la newsletter.
+  - intent: ask_membership
+    examples: |
+      - Est-ce que la réduction Astronomy+ s’applique ?
+      - Suis-je membre Astronomy+ ?
+      - Quand mon abonnement expire-t-il ?
+      - Quelle réduction ai-je obtenue ?
+      - Comment annuler mon abonnement ?
+      - Quels sont mes avantages ?
+      - Combien de points ou de crédits ai-je ?
+      - Ma réduction peut-elle être appliquée à cette commande ?
+  - intent: ask_professional
+    examples: |
+      - Proposez-vous un tarif pour les clubs d’astronomie ?
+      - Puis-je obtenir un devis ?
+      - Pouvez-vous créer une facture au nom de mon entreprise ?
+      - J’ai besoin d’une facture sans TVA.
+      - Je représente un club et je souhaite un devis.
+      - Comment fonctionne le remboursement de la cotisation du club ?
+      - Proposez-vous des commandes groupées ?
+      - Nous sommes une école et souhaitons acheter plusieurs télescopes.
+      - Je souhaite devenir revendeur.
+      - Je veux proposer un partenariat ou tester un produit.
+      - Avez-vous un programme d’affiliation ?
 `;
 
 export const DEFAULT_STORIES_YAML = `version: "3.1"
@@ -116,14 +315,70 @@ stories:
 export const DEFAULT_RULES_YAML = `version: "3.1"
 
 rules:
-  - rule: répondre aux questions de livraison
+  - rule: conseil produit
     steps:
-      - intent: ask_delivery
-      - action: utter_delivery
-  - rule: orienter vers le support
+      - intent: ask_product_advice
+      - action: utter_product_advice
+  - rule: compatibilité
     steps:
-      - intent: ask_support
-      - action: utter_support
+      - intent: ask_compatibility
+      - action: utter_compatibility
+  - rule: comparaison
+    steps:
+      - intent: ask_product_comparison
+      - action: utter_product_comparison
+  - rule: disponibilité
+    steps:
+      - intent: ask_availability
+      - action: utter_availability
+  - rule: livraison publique
+    steps:
+      - intent: ask_delivery_policy
+      - action: utter_delivery_policy
+  - rule: paiement public
+    steps:
+      - intent: ask_payment_policy
+      - action: utter_payment_policy
+  - rule: commande sécurisée
+    steps:
+      - intent: ask_order_account
+      - action: utter_order_account
+  - rule: retours
+    steps:
+      - intent: ask_return_policy
+      - action: utter_return_policy
+  - rule: sav
+    steps:
+      - intent: ask_after_sales
+      - action: utter_after_sales
+  - rule: assistance technique
+    steps:
+      - intent: ask_technical_help
+      - action: utter_technical_help
+  - rule: météo du ciel
+    steps:
+      - intent: ask_sky_forecast
+      - action: utter_sky_forecast
+  - rule: événements du ciel
+    steps:
+      - intent: ask_sky_events
+      - action: utter_sky_events
+  - rule: conseils d’observation
+    steps:
+      - intent: ask_observation_advice
+      - action: utter_observation_advice
+  - rule: compte sécurisé
+    steps:
+      - intent: ask_account
+      - action: utter_account
+  - rule: astronomy plus
+    steps:
+      - intent: ask_membership
+      - action: utter_membership
+  - rule: professionnels
+    steps:
+      - intent: ask_professional
+      - action: utter_professional
 `;
 
 export const DEFAULT_ENDPOINTS_YAML = `# action_endpoint:

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getSession } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { requireDeployedAssistant } from "@/lib/models";
 import {
   executeRuntimeMessage,
@@ -27,10 +28,23 @@ export async function POST(request: NextRequest, context: Context) {
     const { id } = await context.params;
     const input = schema.parse(await request.json());
     await requireDeployedAssistant(id);
+    const configuredBotId =
+      process.env.STOREFRONT_CAPABILITIES_BOT_ID?.trim();
+    const capabilityBot = configuredBotId
+      ? await db.storeBot.findFirst({
+          where: {
+            id: configuredBotId,
+            assistantId: id,
+            enabled: true
+          },
+          select: { id: true }
+        })
+      : null;
     const result = await executeRuntimeMessage({
       assistantId: id,
       senderId: input.sender,
       channel: "studio",
+      ...(capabilityBot ? { storeBotId: capabilityBot.id } : {}),
       requestId: input.requestId,
       text: input.message,
       metadata: {
