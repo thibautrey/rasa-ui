@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { buildTrainingYaml } from "@/lib/assistant-documents";
+import { RequestOriginError } from "@/lib/security";
 
 export type RasaDocuments = Parameters<typeof buildTrainingYaml>[0];
 
@@ -178,6 +179,12 @@ async function rasaFetch(
 }
 
 export function publicRasaError(error: unknown) {
+  if (error instanceof RequestOriginError) {
+    return {
+      error: "Forbidden",
+      code: "INVALID_REQUEST_ORIGIN"
+    };
+  }
   if (error instanceof RasaApiError) {
     return {
       error: error.message,
@@ -196,6 +203,7 @@ export function publicRasaError(error: unknown) {
 }
 
 export function publicRasaHttpStatus(error: unknown) {
+  if (error instanceof RequestOriginError) return 403;
   if (!(error instanceof RasaApiError)) return 500;
   if (error.code === "RASA_TIMEOUT") return 504;
   if (error.code === "RASA_UNREACHABLE") return 503;

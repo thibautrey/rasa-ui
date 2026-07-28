@@ -10,6 +10,9 @@ export type RuntimePolicyDecision = {
 const AUTH_REQUIRED_REPLY =
   "Cette demande concerne des données personnelles ou une action sur un compte, une commande, un paiement ou un abonnement. Je ne peux ni consulter ni modifier ces éléments dans ce chat. Connectez-vous à l’espace client sécurisé ou contactez le support depuis cet espace, sans partager ici d’adresse, d’email, de référence de commande ni de donnée de paiement.";
 
+const DATA_ACCESS_REPLY =
+  "Je ne peux pas consulter vos données personnelles dans ce chat. Pour exercer votre droit d’accès, connectez-vous à l’espace client sécurisé puis utilisez le canal officiel de confidentialité ou le support pour demander une copie des données associées à votre compte. Toute vérification d’identité doit avoir lieu uniquement dans ce canal sécurisé : ne publiez ici ni adresse, ni email, ni référence de commande, ni document d’identité.";
+
 const SECURE_SUPPORT_REQUIRED_REPLY =
   "Cette demande nécessite l’ouverture ou la consultation d’un dossier sécurisé. Utilisez l’espace client ou le formulaire de support pour transmettre la référence de commande, les photos ou les documents utiles. Ne publiez pas ces informations dans ce chat.";
 
@@ -18,6 +21,9 @@ const HUMAN_CONTACT_REQUIRED_REPLY =
 
 const SOLAR_SAFETY_REPLY =
   "Pour toute observation solaire, utilisez uniquement un filtre solaire certifié adapté au modèle et au diamètre exacts, solidement placé à l’ouverture de l’instrument — jamais à l’oculaire. N’observez jamais le Soleil sans protection adaptée, y compris pendant une éclipse. Pour l’observation sans instrument, utilisez des lunettes d’éclipse conformes à la norme ISO 12312-2 ; elles ne protègent pas derrière un télescope, des jumelles ou un chercheur. Si la référence ou le diamètre de l’équipement n’est pas certain, ne l’utilisez pas pour viser le Soleil.";
+
+const ECLIPSE_PREPARATION_REPLY =
+  "Pour préparer l’éclipse, vérifiez d’abord les horaires locaux et la visibilité depuis votre lieu dans une source astronomique officielle, choisissez un site avec un horizon dégagé, prévoyez une solution de repli selon la météo et installez-vous suffisamment tôt. Pour l’observation sans instrument, utilisez uniquement des lunettes d’éclipse conformes à la norme ISO 12312-2 et en bon état. Avec un télescope, des jumelles, une caméra ou un chercheur, utilisez un filtre solaire certifié adapté au modèle et au diamètre exacts, solidement placé à l’ouverture de chaque instrument — jamais à l’oculaire. N’observez jamais le Soleil sans protection adaptée, y compris pendant une éclipse, et n’utilisez pas un équipement dont le filtre ou la fixation n’a pas été vérifié.";
 
 const authRequiredPatterns = [
   /\b(?:affiche|montre|liste|retrouve|verifie|consulte)\b.{0,50}\b(?:mes?|ma|mon)\s+(?:commandes?|paiements?|factures?|achats?|abonnements?|credits?|points?)\b/u,
@@ -79,10 +85,30 @@ export function runtimePolicyDecision(
   text: string
 ): RuntimePolicyDecision | null {
   const value = normalized(text);
+  if (
+    /\b(?:prepar\w*.{0,40}eclipse|eclipse.{0,40}prepar\w*)\b/u.test(
+      value
+    )
+  ) {
+    return {
+      intent: "solar_safety",
+      reply: ECLIPSE_PREPARATION_REPLY
+    };
+  }
   if (/\b(?:eclipse|soleil|solaire)\b/u.test(value)) {
     return {
       intent: "solar_safety",
       reply: SOLAR_SAFETY_REPLY
+    };
+  }
+  if (
+    /\b(?:quelles donnees|donnees avez-vous)\b.{0,40}\b(?:moi|mon sujet)\b/u.test(
+      value
+    )
+  ) {
+    return {
+      intent: "auth_required",
+      reply: DATA_ACCESS_REPLY
     };
   }
   if (matches(value, authRequiredPatterns)) {

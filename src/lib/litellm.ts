@@ -285,6 +285,40 @@ function enforceCompatibilityClarification(
   ) {
     return "Pour vérifier si la monture supporte le tube, indiquez le modèle exact de la monture et le poids total du tube équipé, accessoires compris. Si ce poids n’est pas connu, indiquez le modèle du tube et les accessoires principaux ; la marge de charge doit être plus prudente en astrophotographie qu’en observation visuelle.";
   }
+  if (/\blunette\b/u.test(message) && /\basiair\b/u.test(message)) {
+    return "L’ASIAIR ne se connecte pas directement à la lunette optique : la compatibilité dépend surtout de la monture et des équipements à piloter. Indiquez le modèle d’ASIAIR, la référence exacte de la monture et les appareils concernés — caméra, focuser, roue à filtres ou autre — afin de vérifier leurs interfaces et protocoles. La seule référence de la lunette ne permet pas de confirmer cette compatibilité.";
+  }
+  if (/\bdobson\b/u.test(message) && /\btrepied\b/u.test(message)) {
+    return "Un Dobson est normalement conçu pour sa base au sol et ne se fixe pas directement sur un trépied. Pour confirmer une autre installation, indiquez la référence exacte du Dobson, le poids total du tube équipé et son interface de fixation — anneaux ou queue d’aronde — puis vérifiez qu’une monture sur trépied accepte cette interface avec une capacité de charge suffisante. Le diamètre du tube seul ne suffit pas.";
+  }
+  return value;
+}
+
+function enforceGeneralTechnicalGuidance(
+  input: GenerateReplyInput,
+  value: string
+) {
+  if (
+    input.nlu.intent?.name !== "ask_technical_help" ||
+    !input.assistant.language.toLocaleLowerCase().startsWith("fr")
+  ) {
+    return value;
+  }
+  const message = input.message
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .toLocaleLowerCase("fr")
+    .replace(/[’']/g, " ");
+  if (/\bmise en station\b/u.test(message)) {
+    return "Pour une monture équatoriale : stabilisez et mettez le trépied à niveau, orientez l’axe polaire vers le nord céleste — ou le sud céleste dans l’hémisphère Sud —, réglez la latitude du lieu, puis affinez l’alignement avec le viseur polaire ou l’assistant de la monture avant l’alignement sur les étoiles. Une approximation suffit souvent en visuel ; l’astrophotographie exige un alignement plus précis. Indiquez le modèle exact de la monture uniquement si vous voulez la procédure propre à ses réglages.";
+  }
+  if (
+    /\bconnect\w*\b.{0,40}\bmonture\b.{0,40}\btelephone\b/u.test(
+      message
+    )
+  ) {
+    return "La connexion dépend du modèle de monture : activez son Wi-Fi ou son Bluetooth s’il est intégré, ou installez le module officiel requis, puis connectez le téléphone au réseau ou à l’appareil et sélectionnez la monture dans l’application compatible. Certaines montures utilisent plutôt un adaptateur USB ou série adapté au téléphone. Indiquez uniquement la référence exacte de la monture et le modèle du téléphone pour préciser l’application, le module et le câble nécessaires.";
+  }
   return value;
 }
 
@@ -386,9 +420,12 @@ export async function generateLiteLlmReply(input: GenerateReplyInput) {
   }
 
   const body = await readBoundedJsonResponse(response, maxResponseBytes);
-  const text = enforceCompatibilityClarification(
+  const text = enforceGeneralTechnicalGuidance(
     input,
-    enforceSolarSafety(responseText(body))
+    enforceCompatibilityClarification(
+      input,
+      enforceSolarSafety(responseText(body))
+    )
   );
   if (!text) {
     throw new LiteLlmError(

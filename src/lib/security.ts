@@ -36,6 +36,13 @@ export class RequestBodyTooLargeError extends Error {
   }
 }
 
+export class RequestOriginError extends Error {
+  constructor() {
+    super("Invalid request origin.");
+    this.name = "RequestOriginError";
+  }
+}
+
 export function storefrontWidgetEnabled() {
   return (
     process.env.STOREFRONT_WIDGET_ENABLED?.trim().toLowerCase() ===
@@ -46,7 +53,7 @@ export function storefrontWidgetEnabled() {
 export function assertSameOrigin(request: NextRequest) {
   const origin = request.headers.get("origin");
   if (!origin) {
-    throw new Error("Missing request origin.");
+    throw new RequestOriginError();
   }
   const configured = process.env.NEXT_PUBLIC_APP_URL;
   const production = process.env.NODE_ENV === "production";
@@ -67,10 +74,10 @@ export function assertSameOrigin(request: NextRequest) {
   try {
     requestOrigin = new URL(origin).origin;
   } catch {
-    throw new Error("Invalid request origin.");
+    throw new RequestOriginError();
   }
   if (requestOrigin !== origin || requestOrigin !== expectedOrigin) {
-    throw new Error("Invalid request origin.");
+    throw new RequestOriginError();
   }
 }
 
